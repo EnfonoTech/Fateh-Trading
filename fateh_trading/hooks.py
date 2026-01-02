@@ -1,8 +1,8 @@
 app_name = "fateh_trading"
 app_title = "Fateh Trading"
-app_publisher = "Enfono"
-app_description = "custom app for trading"
-app_email = "ramees@enfono.com"
+app_publisher = "ramees"
+app_description = "To get Last Purchase Rate in Sales Invoice"
+app_email = "ramees@enfono.in"
 app_license = "mit"
 
 # Apps
@@ -43,7 +43,12 @@ app_license = "mit"
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {
+    "Sales Invoice": "public/js/customer_price_history.js",
+    "Delivery Note": "public/js/customer_price_history.js",
+    "Sales Order": "public/js/customer_price_history.js",
+    "Quotation": "public/js/customer_price_history.js"
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -241,4 +246,3 @@ app_license = "mit"
 # default_log_clearing_doctypes = {
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
-
