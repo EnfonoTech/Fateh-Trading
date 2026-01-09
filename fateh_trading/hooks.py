@@ -44,10 +44,18 @@ app_license = "mit"
 
 # include js in doctype views
 doctype_js = {
-    "Sales Invoice": "public/js/customer_price_history.js",
+    "Sales Invoice": [
+        "public/js/customer_price_history.js",
+        "public/js/weighted_discount.js",
+        "public/js/sales_invoice.js",
+    ],
     "Delivery Note": "public/js/customer_price_history.js",
     "Sales Order": "public/js/customer_price_history.js",
-    "Quotation": "public/js/customer_price_history.js"
+    "Quotation": "public/js/customer_price_history.js",
+    "Purchase Invoice": [
+        "public/js/weighted_discount.js",
+        "public/js/purchase_invoice.js"
+    ]
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -246,3 +254,30 @@ doctype_js = {
 # default_log_clearing_doctypes = {
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
+
+fixtures = [
+    {
+        "dt": "Custom Field",
+        "filters": [
+            [
+                "name",
+                "in",
+                [
+                    # Sales Invoice
+                    "Sales Invoice-custom_weighted_discount",
+
+                    # Purchase Invoice
+                    "Purchase Invoice-custom_weighted_discount",
+
+                    # Sales Invoice Item
+                    "Sales Invoice Item-custom_actual_rate",
+                    "Sales Invoice Item-custom_item_discount",
+
+                    # Purchase Invoice Item
+                    "Purchase Invoice Item-custom_actual_rate",
+                    "Purchase Invoice Item-custom_item_discount",
+                ]
+            ]
+        ]
+    }
+]

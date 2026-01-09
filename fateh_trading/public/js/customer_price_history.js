@@ -237,6 +237,7 @@ $.extend(fateh_trading.test, {
 
         $box.on("click", ".pa-use", function () {
             frappe.model.set_value(row.doctype, row.name, "rate", $(this).closest(".pa-line").data("rate"));
+            frappe.model.set_value(row.doctype, row.name, "actual_rate", $(this).closest(".pa-line").data("rate"));
             fateh_trading.test.hide(row);
         });
 
