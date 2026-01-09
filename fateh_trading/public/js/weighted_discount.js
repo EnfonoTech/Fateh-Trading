@@ -1,6 +1,18 @@
 window.apply_weighted_discount = function (frm) {
     const discount = flt(frm.doc.custom_weighted_discount || 0);
-    if (!discount || !frm.doc.items || frm.doc.items.length === 0) return;
+    
+    if (!frm.doc.items || frm.doc.items.length === 0) return;
+
+    // If discount is 0 or null, restore rates to original actual_rate values
+    if (!discount) {
+        frm.doc.items.forEach(row => {
+            const actual_rate = flt(row.custom_actual_rate || row.rate || 0);
+            frappe.model.set_value(row.doctype, row.name, "custom_item_discount", 0);
+            frappe.model.set_value(row.doctype, row.name, "rate", actual_rate);
+        });
+        frm.refresh_field("items");
+        return;
+    }
 
     let total_actual_rate = 0;
 
