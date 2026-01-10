@@ -49,8 +49,14 @@ doctype_js = {
         "public/js/weighted_discount.js",
         "public/js/sales_invoice.js",
     ],
-    "Delivery Note": "public/js/customer_price_history.js",
-    "Sales Order": "public/js/customer_price_history.js",
+    "Delivery Note": [
+        "public/js/customer_price_history.js",
+        "public/js/delivery_note.js"
+    ],
+    "Sales Order": [
+        "public/js/customer_price_history.js",
+        "public/js/sales_order.js"
+    ],
     "Quotation": [
         "public/js/customer_price_history.js",
         "public/js/weighted_discount.js",
@@ -59,7 +65,9 @@ doctype_js = {
     "Purchase Invoice": [
         "public/js/weighted_discount.js",
         "public/js/purchase_invoice.js"
-    ]
+    ],
+    "Purchase Order": "public/js/purchase_order.js"
+
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -276,10 +284,12 @@ fixtures = [
                     # Sales Invoice Item
                     "Sales Invoice Item-custom_actual_rate",
                     "Sales Invoice Item-custom_item_discount",
+                    "Sales Invoice Item-custom_discount_on_amount",
 
                     # Purchase Invoice Item
                     "Purchase Invoice Item-custom_actual_rate",
                     "Purchase Invoice Item-custom_item_discount",
+                    "Purchase Invoice Item-custom_discount_on_amount",
 
                     # Quotation
                     "Quotation-custom_weighted_discount",
@@ -287,6 +297,16 @@ fixtures = [
                     # Quotation Item
                     "Quotation Item-custom_actual_rate",
                     "Quotation Item-custom_item_discount",
+                    "Quotation Item-custom_discount_on_amount",
+
+                    # Sales Order Item
+                    "Sales Order Item-custom_discount_on_amount",
+
+                    # Purchase Order Item
+                    "Purchase Order Item-custom_discount_on_amount",
+
+                    # Delivery Note Item
+                    "Delivery Note Item-custom_discount_on_amount"
                 ]
             ]
         ]
