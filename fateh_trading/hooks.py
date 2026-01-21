@@ -306,7 +306,11 @@ fixtures = [
                     "Purchase Order Item-custom_discount_on_amount",
 
                     # Delivery Note Item
-                    "Delivery Note Item-custom_discount_on_amount"
+                    "Delivery Note Item-custom_discount_on_amount",
+
+                    # Purchase Receipt Item
+                    "Purchase Receipt Item-custom_actual_rate",
+                    "Purchase Receipt Item-custom_discount_on_amount",
                 ]
             ]
         ]
