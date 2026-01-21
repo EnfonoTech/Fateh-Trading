@@ -13,14 +13,17 @@ frappe.ui.form.on("Quotation Item", {
             return;
         }
 
+        // Update custom_actual_rate when rate is manually changed
+        frappe.model.set_value(cdt, cdn, "custom_actual_rate", row.rate);
         frappe.model.set_value(cdt, cdn, "custom_discount_on_amount", null);
     },
 
     item_code(frm, cdt, cdn) {
         const row = locals[cdt][cdn];
 
-        if (!row.custom_actual_rate && row.rate) {
-            frappe.model.set_value(cdt, cdn, "custom_actual_rate", row.rate);
+        // Set custom_actual_rate from price_list_rate when item is selected
+        if (row.price_list_rate) {
+            frappe.model.set_value(cdt, cdn, "custom_actual_rate", row.price_list_rate);
         }
     },
 
@@ -29,7 +32,7 @@ frappe.ui.form.on("Quotation Item", {
         
         if (row.custom_discount_on_amount) {
             const discount_per_unit = row.custom_discount_on_amount / row.qty;
-            const new_rate = row.rate - discount_per_unit;
+            const new_rate = row.custom_actual_rate - discount_per_unit;
             
             // Set flag before programmatic update
             row.__updating_rate_programmatically = true;

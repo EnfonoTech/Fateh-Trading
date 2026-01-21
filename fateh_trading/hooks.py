@@ -66,7 +66,8 @@ doctype_js = {
         "public/js/weighted_discount.js",
         "public/js/purchase_invoice.js"
     ],
-    "Purchase Order": "public/js/purchase_order.js"
+    "Purchase Order": "public/js/purchase_order.js",
+    "Purchase Receipt": "public/js/purchase_receipt.js"
 
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
@@ -300,12 +301,15 @@ fixtures = [
                     "Quotation Item-custom_discount_on_amount",
 
                     # Sales Order Item
+                    "Sales Order Item-custom_actual_rate",
                     "Sales Order Item-custom_discount_on_amount",
 
                     # Purchase Order Item
+                    "Purchase Order Item-custom_actual_rate",
                     "Purchase Order Item-custom_discount_on_amount",
 
                     # Delivery Note Item
+                    "Delivery Note Item-custom_actual_rate",
                     "Delivery Note Item-custom_discount_on_amount",
 
                     # Purchase Receipt Item
