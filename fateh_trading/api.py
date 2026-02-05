@@ -2,8 +2,9 @@ import frappe
 
 @frappe.whitelist()
 def get_item_sales_history(item_code=None, limit=20):
-    """Get item sales history with last purchase rates"""
-    # permission check
+    """Get item sales history, hide last_purchase_rate if purchase permissions missing"""
+
+    # Sales Invoice read must
     if not frappe.has_permission("Sales Invoice", "read"):
         frappe.throw("Not permitted", frappe.PermissionError)
 
@@ -20,7 +21,7 @@ def get_item_sales_history(item_code=None, limit=20):
     rows = frappe.db.sql(f"""
         SELECT
             si.posting_date,
-            si.name           AS sales_invoice,
+            si.customer_name  AS sales_invoice,
             si.customer,
             si.company,
             sii.item_code,
@@ -45,6 +46,14 @@ def get_item_sales_history(item_code=None, limit=20):
         ORDER BY si.posting_date DESC, si.name DESC, sii.idx ASC
         LIMIT %(limit)s
     """, params, as_dict=True)
+     
+    if not (
+        frappe.has_permission("Purchase Invoice", "read")
+        and frappe.has_permission("Purchase Receipt", "read")
+    ):
+        for row in rows:
+            row.pop("last_purchase_rate", None)
 
     return rows
+
 
