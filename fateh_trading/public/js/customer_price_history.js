@@ -317,8 +317,10 @@ function open_item_history_dialog(frm, default_item_code) {
       title: 'Item Sales & Purchase Price History',
       fields: [
         { fieldname: 'item_code', label: 'Item Code', fieldtype: 'Link', options: 'Item', default: default_item_code },
+        { fieldname: 'item_description', label: 'Item Description', fieldtype: 'Small Text', read_only: 1 },
         { fieldname: 'results', fieldtype: 'HTML' }
-      ],
+        ],
+
       size: 'extra-large',
       primary_action_label: 'Close',
       primary_action: function () {
@@ -327,6 +329,7 @@ function open_item_history_dialog(frm, default_item_code) {
     });
   
     d.show();
+    
   
     setTimeout(() => {
       // Bind using Frappe's built-in onchange for the Link field
@@ -334,6 +337,11 @@ function open_item_history_dialog(frm, default_item_code) {
         d.fields_dict.item_code.df.onchange = function () {
           const item_code = d.get_value('item_code');
           if (item_code) {
+
+            frappe.db.get_value('Item', item_code, 'description', r => {
+              d.set_value('item_description', r?.description || '');
+            });
+
             fetch_item_history(item_code, 20, d);
           }
         };
@@ -341,6 +349,11 @@ function open_item_history_dialog(frm, default_item_code) {
   
       // Auto-fetch if dialog opened with default item
       if (default_item_code) {
+
+        frappe.db.get_value('Item', default_item_code, 'description', r => {
+          d.set_value('item_description', r?.description || '');
+        });
+
         fetch_item_history(default_item_code, 20, d);
       }
     }, 200);

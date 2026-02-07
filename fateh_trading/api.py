@@ -47,8 +47,8 @@ def get_item_sales_history(item_code=None, limit=20):
     rows = frappe.db.sql(f"""
         SELECT
             si.posting_date,
-            si.customer_name AS sales_invoice,
-            si.customer,
+            si.name AS sales_invoice,
+            si.customer_name AS customer,
             si.company,
             sii.item_code,
             sii.item_name,
