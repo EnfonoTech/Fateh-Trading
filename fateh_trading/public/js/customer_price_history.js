@@ -317,8 +317,10 @@ function open_item_history_dialog(frm, default_item_code) {
       title: 'Item Sales & Purchase Price History',
       fields: [
         { fieldname: 'item_code', label: 'Item Code', fieldtype: 'Link', options: 'Item', default: default_item_code },
+        { fieldname: 'item_description', label: 'Item Description', fieldtype: 'Small Text', read_only: 1 },
         { fieldname: 'results', fieldtype: 'HTML' }
-      ],
+        ],
+
       size: 'extra-large',
       primary_action_label: 'Close',
       primary_action: function () {
@@ -327,6 +329,7 @@ function open_item_history_dialog(frm, default_item_code) {
     });
   
     d.show();
+    
   
     setTimeout(() => {
       // Bind using Frappe's built-in onchange for the Link field
@@ -334,6 +337,11 @@ function open_item_history_dialog(frm, default_item_code) {
         d.fields_dict.item_code.df.onchange = function () {
           const item_code = d.get_value('item_code');
           if (item_code) {
+
+            frappe.db.get_value('Item', item_code, 'description', r => {
+              d.set_value('item_description', r?.description || '');
+            });
+
             fetch_item_history(item_code, 20, d);
           }
         };
@@ -341,6 +349,11 @@ function open_item_history_dialog(frm, default_item_code) {
   
       // Auto-fetch if dialog opened with default item
       if (default_item_code) {
+
+        frappe.db.get_value('Item', default_item_code, 'description', r => {
+          d.set_value('item_description', r?.description || '');
+        });
+
         fetch_item_history(default_item_code, 20, d);
       }
     }, 200);
@@ -378,50 +391,35 @@ function open_item_history_dialog(frm, default_item_code) {
   }
   
   function render_history_table(rows) {
-    var out = [
-      '<div class="mt-3">',
-      '<table class="table table-bordered table-sm" id="price-history-table">',
-      '<thead>',
-      '<tr>',
-      '<th>Item Code</th>',
-      '<th>Item Name</th>',
-      '<th>Customer</th>',
-      '<th>Sales Rate (Txn)</th>',
-      '<th>Qty</th>',
-      '<th>Last Purchase Rate</th>',
-      '</tr>',
-      '<tr class="filter-row">',
-      '<th><input type="text" class="form-control input-sm" placeholder="Filter Item Code"></th>',
-      '<th><input type="text" class="form-control input-sm" placeholder="Filter Item Name"></th>',
-      '<th><input type="text" class="form-control input-sm" placeholder="Filter Customer"></th>',
-      '<th><input type="text" class="form-control input-sm" placeholder="Filter Sales Rate"></th>',
-      '<th><input type="text" class="form-control input-sm" placeholder="Filter Qty"></th>',
-      '<th><input type="text" class="form-control input-sm" placeholder="Filter Purchase Rate"></th>',
-      '</tr>',
-      '</thead>',
-      '<tbody>'
-    ].join('');
-  
-    rows.forEach(function (r) {
-      var item_code = frappe.utils.escape_html(r.item_code || '');
-      var item_name = frappe.utils.escape_html(r.item_name || '');
-      var cust = frappe.utils.escape_html(r.customer || '');
-      out += [
-        '<tr>',
-        `<td>${item_code}</td>`,
-        `<td>${item_name}</td>`,
-        `<td>${cust}</td>`,
-        `<td class="text-right">${format_currency(r.sales_rate || 0, r.currency || '')}</td>`,
-        `<td class="text-right">${format_number(r.qty || 0, null)}</td>`,
-        `<td class="text-right">${format_currency(r.last_purchase_rate || 0, r.currency || '')}</td>`,
-        '</tr>'
-      ].join('');
+    // Check if last_purchase_rate exists in rows
+    const show_purchase_rate = rows.length && "last_purchase_rate" in rows[0];
+    let out = '';
+
+    // Table start
+    out += '<div class="mt-3"><table class="table table-bordered table-sm" id="price-history-table">';
+    out += '<thead><tr>';
+    out += '<th>Item Code</th><th>Item Name</th><th>Customer</th><th>Sales Rate (Txn)</th><th>Qty</th>';
+    if (show_purchase_rate) out += '<th>Last Purchase Rate</th>';
+    out += '</tr></thead>';
+   
+    out += '<tbody>';
+    rows.forEach(function(r) {
+        out += '<tr>';
+        out += `<td>${frappe.utils.escape_html(r.item_code || '')}</td>`;
+        out += `<td>${frappe.utils.escape_html(r.item_name || '')}</td>`;
+        out += `<td>${frappe.utils.escape_html(r.customer || '')}</td>`;
+        out += `<td>${format_currency(r.sales_rate || 0, r.currency || '')}</td>`;
+        out += `<td>${format_number(r.qty || 0)}</td>`;
+        if (show_purchase_rate) {
+            out += `<td>${format_currency(r.last_purchase_rate || 0, r.currency || '')}</td>`;
+        }
+        out += '</tr>';
     });
-  
     out += '</tbody></table></div>';
-    return out;
-  }
-  
+
+    return out; 
+}
+
   function setupTableFilters(dialog) {
     // Use dialog wrapper to scope the search
     const table = dialog.fields_dict.results.$wrapper.find('#price-history-table')[0];
