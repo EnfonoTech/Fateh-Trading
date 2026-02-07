@@ -45,30 +45,24 @@ app_license = "mit"
 # include js in doctype views
 doctype_js = {
     "Sales Invoice": [
-        "public/js/customer_price_history.js",
-        "public/js/weighted_discount.js",
-        "public/js/sales_invoice.js",
+        "public/js/customer_price_history.js"
+        # "public/js/weighted_discount.js",
+        # "public/js/sales_invoice.js",
     ],
     "Delivery Note": [
-        "public/js/customer_price_history.js",
-        "public/js/delivery_note.js"
+        "public/js/customer_price_history.js"
+        # "public/js/delivery_note.js"
     ],
     "Sales Order": [
-        "public/js/customer_price_history.js",
-        "public/js/sales_order.js"
+        "public/js/customer_price_history.js"
+        # "public/js/sales_order.js"
     ],
     "Quotation": [
-        "public/js/customer_price_history.js",
-        "public/js/weighted_discount.js",
-        "public/js/quotation.js",
-    ],
-    "Purchase Invoice": [
-        "public/js/weighted_discount.js",
-        "public/js/purchase_invoice.js"
-    ],
-    "Purchase Order": "public/js/purchase_order.js",
-    "Purchase Receipt": "public/js/purchase_receipt.js"
-
+        "public/js/customer_price_history.js"
+        # "public/js/weighted_discount.js",
+        # "public/js/quotation.js",
+    ]
+    
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
@@ -268,55 +262,55 @@ doctype_js = {
 # 	"Logging DocType Name": 30  # days to retain logs
 # }
 
-fixtures = [
-    {
-        "dt": "Custom Field",
-        "filters": [
-            [
-                "name",
-                "in",
-                [
-                    # Sales Invoice
-                    "Sales Invoice-custom_weighted_discount",
+# fixtures = [
+#     {
+#         "dt": "Custom Field",
+#         "filters": [
+#             [
+#                 "name",
+#                 "in",
+#                 [
+#                     # Sales Invoice
+#                     "Sales Invoice-custom_weighted_discount",
 
-                    # Purchase Invoice
-                    "Purchase Invoice-custom_weighted_discount",
+#                     # Purchase Invoice
+#                     "Purchase Invoice-custom_weighted_discount",
 
-                    # Sales Invoice Item
-                    "Sales Invoice Item-custom_actual_rate",
-                    "Sales Invoice Item-custom_item_discount",
-                    "Sales Invoice Item-custom_discount_on_amount",
+#                     # Sales Invoice Item
+#                     "Sales Invoice Item-custom_actual_rate",
+#                     "Sales Invoice Item-custom_item_discount",
+#                     "Sales Invoice Item-custom_discount_on_amount",
 
-                    # Purchase Invoice Item
-                    "Purchase Invoice Item-custom_actual_rate",
-                    "Purchase Invoice Item-custom_item_discount",
-                    "Purchase Invoice Item-custom_discount_on_amount",
+#                     # Purchase Invoice Item
+#                     "Purchase Invoice Item-custom_actual_rate",
+#                     "Purchase Invoice Item-custom_item_discount",
+#                     "Purchase Invoice Item-custom_discount_on_amount",
 
-                    # Quotation
-                    "Quotation-custom_weighted_discount",
+#                     # Quotation
+#                     "Quotation-custom_weighted_discount",
 
-                    # Quotation Item
-                    "Quotation Item-custom_actual_rate",
-                    "Quotation Item-custom_item_discount",
-                    "Quotation Item-custom_discount_on_amount",
+#                     # Quotation Item
+#                     "Quotation Item-custom_actual_rate",
+#                     "Quotation Item-custom_item_discount",
+#                     "Quotation Item-custom_discount_on_amount",
 
-                    # Sales Order Item
-                    "Sales Order Item-custom_actual_rate",
-                    "Sales Order Item-custom_discount_on_amount",
+#                     # Sales Order Item
+#                     "Sales Order Item-custom_actual_rate",
+#                     "Sales Order Item-custom_discount_on_amount",
 
-                    # Purchase Order Item
-                    "Purchase Order Item-custom_actual_rate",
-                    "Purchase Order Item-custom_discount_on_amount",
+#                     # Purchase Order Item
+#                     "Purchase Order Item-custom_actual_rate",
+#                     "Purchase Order Item-custom_discount_on_amount",
 
-                    # Delivery Note Item
-                    "Delivery Note Item-custom_actual_rate",
-                    "Delivery Note Item-custom_discount_on_amount",
+#                     # Delivery Note Item
+#                     "Delivery Note Item-custom_actual_rate",
+#                     "Delivery Note Item-custom_discount_on_amount",
 
-                    # Purchase Receipt Item
-                    "Purchase Receipt Item-custom_actual_rate",
-                    "Purchase Receipt Item-custom_discount_on_amount",
-                ]
-            ]
-        ]
-    }
-]
+#                     # Purchase Receipt Item
+#                     "Purchase Receipt Item-custom_actual_rate",
+#                     "Purchase Receipt Item-custom_discount_on_amount",
+#                 ]
+#             ]
+#         ]
+#     }
+# ]
