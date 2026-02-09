@@ -30,6 +30,7 @@ function setup_doctype_handlers(doctype, config) {
             }
             
             if (!frm.__price_assist_row_bound) {
+                const grid = frm.fields_dict.items.grid;
                 frm.fields_dict.items.grid.wrapper.on("click", ".grid-row", function () {
                     const row_name = $(this).attr("data-name");
                     if (!row_name) return;
@@ -42,7 +43,26 @@ function setup_doctype_handlers(doctype, config) {
                     }
 
                     frm.__price_assist_row = row;
+                    if (row.item_code) {
+                        frm._price_history_clicked_item_code = row.item_code;
+                    }
                 });
+                // Track focused row for Price History default item (like sf_trading last selling rate)
+                if (!grid.wrapper.data("price_history_focus_bound")) {
+                    const update_focused_item = function (e) {
+                        const $body = grid.wrapper.find(".grid-body");
+                        if (!$body.length || !$body[0].contains(e.target)) return;
+                        const $row = $(e.target).closest(".grid-row");
+                        if (!$row.length) return;
+                        const grid_row = $row.data("grid_row");
+                        if (grid_row && grid_row.doc && grid_row.doc.item_code) {
+                            frm._price_history_focused_item_code = grid_row.doc.item_code;
+                        }
+                    };
+                    grid.wrapper[0].addEventListener("focusin", update_focused_item, true);
+                    grid.wrapper[0].addEventListener("focusout", update_focused_item, true);
+                    grid.wrapper.data("price_history_focus_bound", true);
+                }
                 frm.__price_assist_row_bound = true;
             }
 
@@ -144,7 +164,7 @@ $.extend(fateh_trading.test, {
         const other_customers = insights.other_customers || [];
         const stock = insights.stock || [];
 
-        const avg_rate = flt(insights.avg_rate || 0);
+        const last_purchase_rate = flt(insights.last_purchase_rate || 0);
         const last_rate = flt(insights.last_rate || 0);
 
         const id = `si-price-assist-${row.name}`;
@@ -171,7 +191,7 @@ $.extend(fateh_trading.test, {
             <div class="pa-summary ${diff_class}">
                 <div class="pa-summary-main">
                     <div><label>Last</label><span>${last_rate || "-"}</span></div>
-                    <div><label>Average</label><span>${avg_rate ? avg_rate.toFixed(2) : "-"}</span></div>
+                    <div><label>Last Purchase</label><span>${last_purchase_rate ? last_purchase_rate.toFixed(2) : "-"}</span></div>
                     <div><label>Current</label><span>${current_rate || "-"}</span></div>
                 </div>
                 <div class="pa-summary-warning">${diff_text}</div>
@@ -298,7 +318,8 @@ function add_price_history_button(frm, $toolbar, price_assist_btn) {
     </button>`);
 
     price_history_btn.on('click', function () {
-      open_item_history_dialog(frm);
+      const default_item_code = get_default_item_for_price_history(frm);
+      open_item_history_dialog(frm, default_item_code);
     });
 
     // Insert after target button
@@ -309,6 +330,36 @@ function add_price_history_button(frm, $toolbar, price_assist_btn) {
     }
     
     frm.price_history_btn_added = true;
+}
+
+// Get default item for Price History dialog: last clicked/focused row, or last row (like sf_trading last selling rate)
+function get_default_item_for_price_history(frm) {
+    if (!frm || !frm.fields_dict.items || !frm.fields_dict.items.grid) {
+        return null;
+    }
+    const items_grid = frm.fields_dict.items.grid;
+
+    // 1. Prefer the row that is currently open/expanded
+    const open_row = frappe.ui.form.get_open_grid_form();
+    if (open_row && open_row.grid === items_grid && open_row.doc && open_row.doc.item_code) {
+        return open_row.doc.item_code;
+    }
+    // 2. Else the row that last had focus
+    if (frm._price_history_focused_item_code) {
+        return frm._price_history_focused_item_code;
+    }
+    // 3. Else the last clicked row in the items grid
+    if (frm._price_history_clicked_item_code) {
+        return frm._price_history_clicked_item_code;
+    }
+    // 4. Fallback: last row's item in the items table
+    if (frm.doc.items && frm.doc.items.length) {
+        const last_row = frm.doc.items[frm.doc.items.length - 1];
+        if (last_row && last_row.item_code) {
+            return last_row.item_code;
+        }
+    }
+    return null;
 }
 
 function open_item_history_dialog(frm, default_item_code) {

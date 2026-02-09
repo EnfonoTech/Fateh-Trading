@@ -122,17 +122,20 @@ def get_item_insights(customer, item_code, company=None, limit=6, other_limit=5)
     stock = get_item_warehouse_stock(item_code=item_code, company=company, limit=8)
 
     last_rate = price_history[0]["rate"] if price_history else 0
-    avg_rate = (
-        sum(flt(d["rate"]) for d in price_history) / len(price_history)
-        if price_history
-        else 0
+    # Last purchase price from Item master (replaces average price)
+    item_doc = frappe.db.get_value(
+        "Item",
+        item_code,
+        ["last_purchase_rate"],
+        as_dict=True,
     )
+    last_purchase_rate = flt(item_doc.get("last_purchase_rate") or 0) if item_doc else 0
 
     return {
         "price_history": price_history,
         "other_customers": other_customers,
         "stock": stock,
-        "avg_rate": avg_rate,
+        "last_purchase_rate": last_purchase_rate,
         "last_rate": last_rate,
     }
 
