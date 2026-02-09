@@ -456,7 +456,7 @@ function open_item_history_dialog(frm, default_item_code) {
     rows.forEach(function (r) {
       var item_code = frappe.utils.escape_html(r.item_code || '');
       var item_name = frappe.utils.escape_html(r.item_name || '');
-      var cust = frappe.utils.escape_html(r.customer || '');
+      var cust = frappe.utils.escape_html(r.customer_name || r.customer || '');
       out += [
         '<tr>',
         `<td>${item_code}</td>`,

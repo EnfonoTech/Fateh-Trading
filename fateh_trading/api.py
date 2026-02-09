@@ -22,6 +22,7 @@ def get_item_sales_history(item_code=None, limit=20):
             si.posting_date,
             si.name           AS sales_invoice,
             si.customer,
+            cust.customer_name,
             si.company,
             sii.item_code,
             sii.item_name,
@@ -30,17 +31,11 @@ def get_item_sales_history(item_code=None, limit=20):
             sii.rate          AS sales_rate,
             sii.amount        AS sales_amount,
             si.currency,
-            (
-                SELECT pii.rate
-                FROM `tabPurchase Invoice Item` pii
-                JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
-                WHERE pi.docstatus = 1
-                  AND pii.item_code = sii.item_code
-                ORDER BY pi.posting_date DESC, pi.name DESC
-                LIMIT 1
-            ) AS last_purchase_rate
+            item.last_purchase_rate
         FROM `tabSales Invoice Item` sii
         JOIN `tabSales Invoice` si ON si.name = sii.parent
+        LEFT JOIN `tabCustomer` cust ON cust.name = si.customer
+        LEFT JOIN `tabItem` item ON item.name = sii.item_code
         WHERE {where_sql}
         ORDER BY si.posting_date DESC, si.name DESC, sii.idx ASC
         LIMIT %(limit)s
