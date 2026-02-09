@@ -27,11 +27,13 @@ def get_item_sales_history(item_code=None, limit=20):
             sii.item_code,
             sii.item_name,
             sii.qty,
+            sii.stock_qty,
             sii.uom,
             sii.rate          AS sales_rate,
             sii.amount        AS sales_amount,
             si.currency,
-            item.last_purchase_rate
+            item.last_purchase_rate,
+            sii.stock_uom_rate
         FROM `tabSales Invoice Item` sii
         JOIN `tabSales Invoice` si ON si.name = sii.parent
         LEFT JOIN `tabCustomer` cust ON cust.name = si.customer

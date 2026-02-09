@@ -177,7 +177,7 @@ $.extend(fateh_trading.test, {
         $box.append(`<div class="pa-customer">${customer}</div>`);
         $box.append(`<div class="pa-title">Price History: ${row.item_name || row.item_code}</div>`);
 
-        const current_rate = flt(row.rate);
+        const current_rate = flt(row.stock_uom_rate ?? row.rate);
         let diff_text = "", diff_class = "";
 
         if (current_rate && last_rate) {
@@ -437,8 +437,8 @@ function open_item_history_dialog(frm, default_item_code) {
       '<th>Item Code</th>',
       '<th>Item Name</th>',
       '<th>Customer</th>',
-      '<th>Sales Rate (Txn)</th>',
-      '<th>Qty</th>',
+      '<th>Sales Rate</th>',
+      '<th>Sales Qty</th>',
       '<th>Last Purchase Rate</th>',
       '</tr>',
       '<tr class="filter-row">',
@@ -446,7 +446,7 @@ function open_item_history_dialog(frm, default_item_code) {
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Item Name"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Customer"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Sales Rate"></th>',
-      '<th><input type="text" class="form-control input-sm" placeholder="Filter Qty"></th>',
+      '<th><input type="text" class="form-control input-sm" placeholder="Filter Sales Qty"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Purchase Rate"></th>',
       '</tr>',
       '</thead>',
@@ -462,8 +462,8 @@ function open_item_history_dialog(frm, default_item_code) {
         `<td>${item_code}</td>`,
         `<td>${item_name}</td>`,
         `<td>${cust}</td>`,
-        `<td class="text-right">${format_currency(r.sales_rate || 0, r.currency || '')}</td>`,
-        `<td class="text-right">${format_number(r.qty || 0, null)}</td>`,
+        `<td class="text-right">${format_currency(r.stock_uom_rate || 0, r.currency || '')}</td>`,
+        `<td class="text-right">${format_number(r.stock_qty ?? r.qty ?? 0, null)}</td>`,
         `<td class="text-right">${format_currency(r.last_purchase_rate || 0, r.currency || '')}</td>`,
         '</tr>'
       ].join('');
