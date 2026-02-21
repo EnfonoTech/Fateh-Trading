@@ -63,11 +63,15 @@ doctype_js = {
         "public/js/quotation.js",
     ],
     "Purchase Invoice": [
+        "public/js/customer_price_history.js",
         "public/js/weighted_discount.js",
         "public/js/purchase_invoice.js"
     ],
     "Purchase Order": "public/js/purchase_order.js",
-    "Purchase Receipt": "public/js/purchase_receipt.js"
+    "Purchase Receipt": [
+        "public/js/customer_price_history.js",
+        "public/js/purchase_receipt.js"
+    ]
 
 }
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
