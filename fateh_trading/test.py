@@ -277,11 +277,23 @@ def get_item_purchase_insights(supplier, item_code, company=None, limit=6, other
             if row and row[0].get("last_rate") is not None:
                 last_rate = flt(row[0]["last_rate"])
 
-    item_doc = frappe.db.get_value(
-        "Item", item_code, ["last_purchase_rate", "valuation_rate"], as_dict=True
-    )
+    # Last purchase rate from Item master; valuation rate from Bin (stock), not Item master
+    item_doc = frappe.db.get_value("Item", item_code, "last_purchase_rate", as_dict=True)
     last_purchase_rate = flt(item_doc.get("last_purchase_rate") or 0) if item_doc else 0
-    valuation_rate = flt(item_doc.get("valuation_rate") or 0) if item_doc else 0
+
+    valuation_rate = 0
+    bin_query = """
+        SELECT SUM(b.stock_value) / NULLIF(SUM(b.actual_qty), 0) AS valuation_rate
+        FROM `tabBin` b
+        WHERE b.item_code = %s AND b.actual_qty > 0
+    """
+    bin_params = [item_code]
+    if company:
+        bin_query += " AND EXISTS (SELECT 1 FROM `tabWarehouse` w WHERE w.name = b.warehouse AND w.company = %s)"
+        bin_params.append(company)
+    row = frappe.db.sql(bin_query, tuple(bin_params), as_dict=True)
+    if row and row[0].get("valuation_rate") is not None:
+        valuation_rate = flt(row[0]["valuation_rate"])
 
     return {
         "price_history": price_history,
