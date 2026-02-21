@@ -218,11 +218,12 @@ $.extend(fateh_trading.test, {
         `);
 
         price_history.forEach(d => {
+            const uom = d.uom || d.stock_uom || "";
             $box.append($(`
                 <div class="pa-line">
                     <div class="pa-left">
-                        <b>${d.rate}</b> (${d.currency}, ${d.uom})
-                        <small>${d.qty} qty • ${frappe.format(d.posting_date, "Date")}</small>
+                        <b>${d.rate}</b> (${d.currency}, ${uom})
+                        <small>${d.qty} ${uom} • ${frappe.format(d.posting_date, "Date")}</small>
                         <small class="pa-inv">
                             <a href="/app/sales-invoice/${encodeURIComponent(d.si)}" target="_blank">${d.si}</a>
                         </small>
@@ -235,10 +236,11 @@ $.extend(fateh_trading.test, {
         if (other_customers.length) {
             $box.append(`<div class="pa-section-title">Other customers paying</div>`);
             other_customers.forEach(d => {
+                const uom = d.uom || d.stock_uom || "";
                 $box.append($(`
                     <div class="pa-line pa-other">
                         <div class="pa-left">
-                            <b>${d.rate}</b> (${d.currency}, ${d.uom})
+                            <b>${d.rate}</b> (${d.currency}, ${uom})
                             <small>${d.customer}</small>
                         </div>
                         <button class="pa-use">Use</button>
@@ -289,7 +291,7 @@ $.extend(fateh_trading.test, {
 
     updateHighlight(row) {
         if (!row || !row._price_id) return;
-        const rate = flt(row.rate);
+        const rate = flt(row.stock_uom_rate ?? row.rate);
         $(`#${row._price_id} .pa-line`).each(function () {
             $(this).toggleClass("pa-match", flt($(this).data("rate")) === rate);
         });
@@ -357,11 +359,12 @@ $.extend(fateh_trading.test, {
 
         price_history.forEach(d => {
             const doc_route = d.doctype === "Purchase Invoice" ? "purchase-invoice" : "purchase-receipt";
+            const uom = d.uom || d.stock_uom || "";
             $box.append($(`
                 <div class="pa-line">
                     <div class="pa-left">
-                        <b>${d.rate}</b> (${d.currency}, ${d.uom})
-                        <small>${d.qty} qty • ${frappe.format(d.posting_date, "Date")}</small>
+                        <b>${d.rate}</b> (${d.currency}, ${uom})
+                        <small>${d.qty} ${uom} • ${frappe.format(d.posting_date, "Date")}</small>
                         <small class="pa-inv">
                             <a href="/app/${doc_route}/${encodeURIComponent(d.doc_name)}" target="_blank">${d.doc_name}</a>
                         </small>
@@ -374,10 +377,11 @@ $.extend(fateh_trading.test, {
         if (other_suppliers.length) {
             $box.append(`<div class="pa-section-title">Other suppliers</div>`);
             other_suppliers.forEach(d => {
+                const uom = d.uom || d.stock_uom || "";
                 $box.append($(`
                     <div class="pa-line pa-other">
                         <div class="pa-left">
-                            <b>${d.rate}</b> (${d.currency}, ${d.uom})
+                            <b>${d.rate}</b> (${d.currency}, ${uom})
                             <small>${d.customer || d.supplier}</small>
                         </div>
                         <button class="pa-use">Use</button>
@@ -653,7 +657,7 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
         `<td>${item_code}</td>`,
         `<td>${item_name}</td>`,
         `<td>${supp}</td>`,
-        `<td class="text-right">${format_currency(r.purchase_rate || r.stock_uom_rate || 0, r.currency || '')}</td>`,
+        `<td class="text-right">${format_currency(r.stock_uom_rate ?? r.purchase_rate ?? 0, r.currency || '')}</td>`,
         `<td class="text-right">${format_number(r.stock_qty ?? r.qty ?? 0, null)}</td>`,
         `<td class="text-right">${format_currency(r.last_selling_rate || 0, r.currency || '')}</td>`,
         `<td><a href="#" data-doctype="${doctype}" data-name="${doc_name}">${doc_name}</a></td>`,

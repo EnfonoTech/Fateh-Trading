@@ -57,6 +57,7 @@ def get_item_insights(customer, item_code, company=None, limit=6, other_limit=5)
             si.posting_date,
             si.customer,
             sid.rate,
+            sid.stock_uom_rate,
             sid.qty,
             sid.stock_qty,
             sid.uom,
@@ -76,6 +77,7 @@ def get_item_insights(customer, item_code, company=None, limit=6, other_limit=5)
     )
 
     for d in price_history:
+        # Keep normal (transaction) rate, uom, qty for Price Assist display
         d["rate"] = flt(d.get("rate") or 0)
         d["qty"] = flt(d.get("qty") or 0)
         d["stock_qty"] = flt(d.get("stock_qty") or 0)
@@ -93,6 +95,7 @@ def get_item_insights(customer, item_code, company=None, limit=6, other_limit=5)
             si.posting_date,
             si.customer,
             sid.rate,
+            sid.stock_uom_rate,
             sid.qty,
             sid.stock_qty,
             sid.uom,
@@ -167,7 +170,7 @@ def get_item_purchase_insights(supplier, item_code, company=None, limit=6, other
 
     supplier = supplier or ""
 
-    # Purchase history from both Purchase Invoice and Purchase Receipt for this supplier
+    # Purchase history from both Purchase Invoice and Purchase Receipt for this supplier (rates & qty in stock UOM)
     pi_query = """
         SELECT
             pi.name AS doc_name,
@@ -175,6 +178,7 @@ def get_item_purchase_insights(supplier, item_code, company=None, limit=6, other
             pi.posting_date,
             pi.supplier,
             pii.rate,
+            pii.stock_uom_rate,
             pii.qty,
             pii.stock_qty,
             pii.uom,
@@ -194,6 +198,7 @@ def get_item_purchase_insights(supplier, item_code, company=None, limit=6, other
             pr.posting_date,
             pr.supplier,
             pri.rate,
+            pri.stock_uom_rate,
             pri.qty,
             pri.stock_qty,
             pri.uom,
@@ -209,23 +214,23 @@ def get_item_purchase_insights(supplier, item_code, company=None, limit=6, other
     lim = cint(limit)
     pi_rows = frappe.db.sql(pi_query, (item_code, supplier, lim), as_dict=True)
     pr_rows = frappe.db.sql(pr_query, (item_code, supplier, lim), as_dict=True)
-    # Merge and sort by posting_date desc, take up to limit
     price_history = []
     for d in pi_rows:
         d["rate"] = flt(d.get("rate") or 0)
-        d["si"] = d["doc_name"]  # reuse key for UI
+        d["qty"] = flt(d.get("qty") or 0)
+        d["si"] = d["doc_name"]
         price_history.append(d)
     for d in pr_rows:
         d["rate"] = flt(d.get("rate") or 0)
+        d["qty"] = flt(d.get("qty") or 0)
         d["si"] = d["doc_name"]
         price_history.append(d)
     price_history.sort(key=lambda x: (x.get("posting_date") or "", x.get("doc_name") or ""), reverse=True)
     price_history = price_history[:lim]
 
-    # Other suppliers (from PI and PR)
     other_pi = frappe.db.sql("""
         SELECT pi.name AS doc_name, 'Purchase Invoice' AS doctype, pi.posting_date, pi.supplier,
-               pii.rate, pii.qty, pii.stock_qty, pii.uom, pii.stock_uom, pii.conversion_factor, pi.currency
+               pii.rate, pii.stock_uom_rate, pii.qty, pii.stock_qty, pii.uom, pii.stock_uom, pii.conversion_factor, pi.currency
         FROM `tabPurchase Invoice Item` pii
         INNER JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
         WHERE pii.item_code = %s AND pi.docstatus = 1 AND pi.supplier != %s
@@ -234,7 +239,7 @@ def get_item_purchase_insights(supplier, item_code, company=None, limit=6, other
     """, (item_code, supplier, cint(other_limit)), as_dict=True)
     other_pr = frappe.db.sql("""
         SELECT pr.name AS doc_name, 'Purchase Receipt' AS doctype, pr.posting_date, pr.supplier,
-               pri.rate, pri.qty, pri.stock_qty, pri.uom, pri.stock_uom, pri.conversion_factor, pr.currency
+               pri.rate, pri.stock_uom_rate, pri.qty, pri.stock_qty, pri.uom, pri.stock_uom, pri.conversion_factor, pr.currency
         FROM `tabPurchase Receipt Item` pri
         INNER JOIN `tabPurchase Receipt` pr ON pr.name = pri.parent
         WHERE pri.item_code = %s AND pr.docstatus = 1 AND pr.supplier != %s
@@ -244,16 +249,18 @@ def get_item_purchase_insights(supplier, item_code, company=None, limit=6, other
     other_suppliers = list(other_pi) + list(other_pr)
     for d in other_suppliers:
         d["rate"] = flt(d.get("rate") or 0)
-        d["customer"] = d.get("supplier")  # UI expects "customer" key for other-party label
+        d["qty"] = flt(d.get("qty") or 0)
+        d["customer"] = d.get("supplier")
     other_suppliers.sort(key=lambda x: (x.get("posting_date") or "", x.get("doc_name") or ""), reverse=True)
     other_suppliers = other_suppliers[: cint(other_limit)]
 
     stock = get_item_warehouse_stock(item_code=item_code, company=company, limit=8)
 
-    # Last purchase rate for this supplier (from PI/PR)
+    # Last purchase rate for this supplier (stock UOM rate)
     last_rate = 0
     if price_history:
-        last_rate = flt(price_history[0].get("rate") or 0)
+        first = price_history[0]
+        last_rate = flt(first.get("stock_uom_rate") or first.get("rate") or 0)
     else:
         row = frappe.db.sql("""
             SELECT COALESCE(pii.stock_uom_rate, pii.rate) AS last_rate
