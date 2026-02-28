@@ -1,6 +1,6 @@
 ### Fateh Trading
 
-custom app for trading
+custom app for trading ERP
 
 ### Installation
 
