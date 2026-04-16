@@ -163,13 +163,20 @@ doctype_js = {
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+    "Quotation": {
+        "on_submit": "fateh_trading.api.update_customer_item_price"
+    },
+    "Sales Order": {
+        "on_submit": "fateh_trading.api.update_customer_item_price"
+    },
+    "Delivery Note": {
+        "on_submit": "fateh_trading.api.update_customer_item_price"
+    },
+    "Sales Invoice": {
+        "on_submit": "fateh_trading.api.update_customer_item_price"
+    }
+}
 
 # Scheduled Tasks
 # ---------------
