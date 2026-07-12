@@ -80,43 +80,41 @@ function setup_doctype_handlers(doctype, config) {
                 frm.__price_assist_row_bound = true;
             }
 
-            if (frm.__price_assist_btn_added) return;
+            // Add both toolbar buttons through the supported grid API. Unlike the
+            // old hand-built HTML + setTimeout approach, add_custom_button styles
+            // and positions the button and keeps it across grid re-renders. It is
+            // idempotent by label, so calling it on every refresh is safe.
+            const grid = frm.fields_dict.items.grid;
+            const cfg = frm.__fateh_trading_config || DOCTYPE_CONFIG[frm.doctype] || { customer_field: "customer", type: "sales" };
+            const is_purchase = cfg.type === "purchase";
 
-            const btn = frm.fields_dict.items.grid.add_custom_button(__("Price Assist"), () => {
+            // Added first: add_custom_button prepends, so Price Assist sits to its left.
+            const hist_label = is_purchase ? __("Show Purchase History") : __("Show Price History");
+            grid.add_custom_button(hist_label, () => {
+                open_item_history_dialog(frm, get_default_item_for_price_history(frm), is_purchase);
+            });
+
+            grid.add_custom_button(__("Price Assist"), () => {
                 const row = frm.__price_assist_row;
-                const config = frm.__fateh_trading_config || { customer_field: "customer", type: "sales" };
-                const party_field = config.party_field || config.customer_field || "customer";
+                const party_field = cfg.party_field || cfg.customer_field || "customer";
 
                 if (!row) {
-                    frappe.msgprint("Please click an Item row first");
+                    frappe.msgprint(__("Please click an Item row first"));
                     return;
                 }
 
                 const party = frm.doc[party_field];
                 if (!party || !row.item_code) {
-                    frappe.msgprint((config.type === "purchase" ? "Supplier" : "Customer") + " and Item Code are required");
+                    frappe.msgprint((is_purchase ? __("Supplier") : __("Customer")) + " " + __("and Item Code are required"));
                     return;
                 }
 
-                if (config.type === "purchase") {
-                    fateh_trading.test.show_purchase(frm, row, config);
+                if (is_purchase) {
+                    fateh_trading.test.show_purchase(frm, row, cfg);
                 } else {
-                    fateh_trading.test.show(frm, row, config);
+                    fateh_trading.test.show(frm, row, cfg);
                 }
             });
-
-            frm.__price_assist_btn_added = true;
-
-            setTimeout(() => {
-                const $toolbar = frm.fields_dict.items.grid.wrapper.find(".grid-buttons");
-                const $add_multiple = $toolbar.find("button:contains('Add Multiple')").last();
-                if ($add_multiple.length && btn) {
-                    $(btn).insertAfter($add_multiple);
-                }
-                
-                // Add Price History button after Price Assist button
-                add_price_history_button(frm, $toolbar, btn, frm.doctype);
-            }, 0);
         }
     });
 
@@ -438,47 +436,6 @@ $(document).on("click.price_assist", function (e) {
         fateh_trading.test.hide(frm.__price_assist_row);
     }
 });
-
-// Price History Button Functions
-function add_price_history_button(frm, $toolbar, price_assist_btn, doctype) {
-    if (frm.price_history_btn_added) return;
-    
-    // Check if button already exists
-    if ($toolbar.find("button:contains('Show Price History')").length > 0) {
-        frm.price_history_btn_added = true;
-        return;
-    }
-
-    const config = DOCTYPE_CONFIG[doctype] || {};
-    const is_purchase = config.type === "purchase";
-
-    // Find the Price Assist button (which was just positioned)
-    let $target = price_assist_btn ? $(price_assist_btn) : $toolbar.find("button:contains('Price Assist')").last();
-    
-    // If Price Assist not found, try Add Multiple button
-    if ($target.length === 0) {
-        $target = $toolbar.find("button:contains('Add Multiple')").last();
-    }
-
-    const btn_label = is_purchase ? __("Show Purchase History") : __("Show Price History");
-    let price_history_btn = $(`<button type="button" class="btn btn-secondary btn-xs btn-custom" style="margin-left: 10px;">
-      ${btn_label}
-    </button>`);
-
-    price_history_btn.on('click', function () {
-      const default_item_code = get_default_item_for_price_history(frm);
-      open_item_history_dialog(frm, default_item_code, is_purchase);
-    });
-
-    // Insert after target button
-    if ($target.length > 0) {
-        price_history_btn.insertAfter($target);
-    } else {
-        $toolbar.append(price_history_btn);
-    }
-    
-    frm.price_history_btn_added = true;
-}
 
 // Get default item for Price History dialog: last clicked/focused row, or last row (like sf_trading last selling rate)
 function get_default_item_for_price_history(frm) {
