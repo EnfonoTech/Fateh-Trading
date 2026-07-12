@@ -115,10 +115,18 @@ function setup_doctype_handlers(doctype, config) {
                 }
             });
 
-            // Keep the native Add Row / Add Multiple buttons first; move our
-            // custom buttons after them (add_custom_button prepends by default).
+            // On sales documents, also offer the item's purchase history (a cost
+            // reference while selling) as a separate button after "Show Price History".
+            const purchase_history_btn = is_purchase ? null : grid.add_custom_button(__("Show Purchase History"), () => {
+                open_item_history_dialog(frm, get_default_item_for_price_history(frm), true);
+            });
+
+            // Keep the native Add Row / Add Multiple buttons first; move our custom
+            // buttons after them (add_custom_button prepends by default), in order:
+            // Price Assist, Show Price History, [Show Purchase History].
             price_assist_btn.appendTo(grid.grid_buttons);
             history_btn.appendTo(grid.grid_buttons);
+            if (purchase_history_btn) purchase_history_btn.appendTo(grid.grid_buttons);
         }
     });
 
