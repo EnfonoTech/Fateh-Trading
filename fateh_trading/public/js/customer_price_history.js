@@ -88,13 +88,12 @@ function setup_doctype_handlers(doctype, config) {
             const cfg = frm.__fateh_trading_config || DOCTYPE_CONFIG[frm.doctype] || { customer_field: "customer", type: "sales" };
             const is_purchase = cfg.type === "purchase";
 
-            // Added first: add_custom_button prepends, so Price Assist sits to its left.
             const hist_label = is_purchase ? __("Show Purchase History") : __("Show Price History");
-            grid.add_custom_button(hist_label, () => {
+            const history_btn = grid.add_custom_button(hist_label, () => {
                 open_item_history_dialog(frm, get_default_item_for_price_history(frm), is_purchase);
             });
 
-            grid.add_custom_button(__("Price Assist"), () => {
+            const price_assist_btn = grid.add_custom_button(__("Price Assist"), () => {
                 const row = frm.__price_assist_row;
                 const party_field = cfg.party_field || cfg.customer_field || "customer";
 
@@ -115,6 +114,11 @@ function setup_doctype_handlers(doctype, config) {
                     fateh_trading.test.show(frm, row, cfg);
                 }
             });
+
+            // Keep the native Add Row / Add Multiple buttons first; move our
+            // custom buttons after them (add_custom_button prepends by default).
+            price_assist_btn.appendTo(grid.grid_buttons);
+            history_btn.appendTo(grid.grid_buttons);
         }
     });
 
@@ -249,15 +253,15 @@ $.extend(fateh_trading.test, {
 
         if (stock.length) {
             $box.append(`<div class="pa-section-title">Stock by Warehouse</div>`);
-            const maxQty = Math.max(...stock.map(s => flt(s.projected_qty))) || 1;
+            const maxQty = Math.max(...stock.map(s => flt(s.actual_qty))) || 1;
 
             stock.forEach(s => {
-                const fill = Math.min(100, (flt(s.projected_qty) / maxQty) * 100);
+                const fill = Math.min(100, (flt(s.actual_qty) / maxQty) * 100);
                 $box.append(`
                     <div class="ps-line">
                         <div class="ps-left">
                             <b>${s.warehouse}</b>
-                            <small>${s.projected_qty} available</small>
+                            <small>${s.actual_qty} available</small>
                         </div>
                         <div class="ps-bar-wrap">
                             <div class="ps-bar" style="width:${fill}%"></div>
@@ -390,14 +394,14 @@ $.extend(fateh_trading.test, {
 
         if (stock.length) {
             $box.append(`<div class="pa-section-title">Stock by Warehouse</div>`);
-            const maxQty = Math.max(...stock.map(s => flt(s.projected_qty))) || 1;
+            const maxQty = Math.max(...stock.map(s => flt(s.actual_qty))) || 1;
             stock.forEach(s => {
-                const fill = Math.min(100, (flt(s.projected_qty) / maxQty) * 100);
+                const fill = Math.min(100, (flt(s.actual_qty) / maxQty) * 100);
                 $box.append(`
                     <div class="ps-line">
                         <div class="ps-left">
                             <b>${s.warehouse}</b>
-                            <small>${s.projected_qty} available</small>
+                            <small>${s.actual_qty} available</small>
                         </div>
                         <div class="ps-bar-wrap">
                             <div class="ps-bar" style="width:${fill}%"></div>
