@@ -24,7 +24,7 @@ def get_item_warehouse_stock(item_code, company=None, limit=8):
 
     query += """
         GROUP BY b.warehouse
-        ORDER BY SUM(b.projected_qty) DESC
+        ORDER BY SUM(b.actual_qty) DESC
         LIMIT %s
     """
     params.append(cint(limit))
