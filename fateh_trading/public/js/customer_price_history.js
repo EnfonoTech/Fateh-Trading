@@ -3,20 +3,39 @@ frappe.provide("fateh_trading.test");
 // Configuration for supported doctypes
 const DOCTYPE_CONFIG = {
     "Sales Invoice": {
+        type: "sales",
         child_doctype: "Sales Invoice Item",
         customer_field: "customer"
     },
     "Delivery Note": {
+        type: "sales",
         child_doctype: "Delivery Note Item",
         customer_field: "customer"
     },
     "Sales Order": {
+        type: "sales",
         child_doctype: "Sales Order Item",
         customer_field: "customer"
     },
     "Quotation": {
+        type: "sales",
         child_doctype: "Quotation Item",
         customer_field: "party_name"
+    },
+    "Purchase Invoice": {
+        type: "purchase",
+        child_doctype: "Purchase Invoice Item",
+        customer_field: "supplier"
+    },
+    "Purchase Receipt": {
+        type: "purchase",
+        child_doctype: "Purchase Receipt Item",
+        customer_field: "supplier"
+    },
+    "Purchase Order": {
+        type: "purchase",
+        child_doctype: "Purchase Order Item",
+        customer_field: "supplier"
     }
 };
 
@@ -67,26 +86,31 @@ function setup_doctype_handlers(doctype, config) {
             }
 
             if (frm.__price_assist_btn_added) return;
-
-            const btn = frm.fields_dict.items.grid.add_custom_button(__("Price Assist"), () => {
-                const row = frm.__price_assist_row;
-                const config = frm.__fateh_trading_config || { customer_field: "customer" };
-
-                if (!row) {
-                    frappe.msgprint("Please click an Item row first");
-                    return;
-                }
-
-                const customer = frm.doc[config.customer_field];
-                if (!customer || !row.item_code) {
-                    frappe.msgprint("Customer and Item Code are required");
-                    return;
-                }
-
-                fateh_trading.test.show(frm, row, config);
-            });
-
             frm.__price_assist_btn_added = true;
+
+            const cfg = frm.__fateh_trading_config || config;
+            const is_purchase = cfg.type === "purchase";
+
+            let btn = null;
+            if (!is_purchase) {
+                btn = frm.fields_dict.items.grid.add_custom_button(__("Price Assist"), () => {
+                    const row = frm.__price_assist_row;
+                    const config = frm.__fateh_trading_config || { customer_field: "customer" };
+
+                    if (!row) {
+                        frappe.msgprint("Please click an Item row first");
+                        return;
+                    }
+
+                    const customer = frm.doc[config.customer_field];
+                    if (!customer || !row.item_code) {
+                        frappe.msgprint("Customer and Item Code are required");
+                        return;
+                    }
+
+                    fateh_trading.test.show(frm, row, config);
+                });
+            }
 
             setTimeout(() => {
                 const $toolbar = frm.fields_dict.items.grid.wrapper.find(".grid-buttons");
@@ -94,9 +118,14 @@ function setup_doctype_handlers(doctype, config) {
                 if ($add_multiple.length && btn) {
                     $(btn).insertAfter($add_multiple);
                 }
-                
-                // Add Price History button after Price Assist button
-                add_price_history_button(frm, $toolbar, btn);
+
+                if (!is_purchase) {
+                    // Add Price History button after Price Assist button
+                    add_price_history_button(frm, $toolbar, btn);
+                }
+
+                // Add Purchase History button (all doctypes)
+                add_purchase_history_button(frm, $toolbar, btn);
             }, 0);
         }
     });
@@ -319,7 +348,7 @@ function add_price_history_button(frm, $toolbar, price_assist_btn) {
 
     price_history_btn.on('click', function () {
       const default_item_code = get_default_item_for_price_history(frm);
-      open_item_history_dialog(frm, default_item_code);
+      open_item_history_dialog(frm, default_item_code, false);
     });
 
     // Insert after target button
@@ -328,8 +357,42 @@ function add_price_history_button(frm, $toolbar, price_assist_btn) {
     } else {
         $toolbar.append(price_history_btn);
     }
-    
+
     frm.price_history_btn_added = true;
+}
+
+// Purchase History Button Functions
+function add_purchase_history_button(frm, $toolbar, price_assist_btn) {
+    if (frm.purchase_history_btn_added) return;
+
+    // Check if button already exists
+    if ($toolbar.find("button:contains('Show Purchase History')").length > 0) {
+        frm.purchase_history_btn_added = true;
+        return;
+    }
+
+    // Prefer inserting after "Show Price History" when present, else after Price Assist / Add Multiple
+    let $target = $toolbar.find("button:contains('Show Price History')").last();
+    if ($target.length === 0) {
+        $target = price_assist_btn ? $(price_assist_btn) : $toolbar.find("button:contains('Add Multiple')").last();
+    }
+
+    let purchase_history_btn = $(`<button type="button" class="btn btn-secondary btn-xs btn-custom" style="margin-left: 10px;">
+      ${__('Show Purchase History')}
+    </button>`);
+
+    purchase_history_btn.on('click', function () {
+      const default_item_code = get_default_item_for_price_history(frm);
+      open_item_history_dialog(frm, default_item_code, true);
+    });
+
+    if ($target.length > 0) {
+        purchase_history_btn.insertAfter($target);
+    } else {
+        $toolbar.append(purchase_history_btn);
+    }
+
+    frm.purchase_history_btn_added = true;
 }
 
 // Get default item for Price History dialog: last clicked/focused row, or last row (like sf_trading last selling rate)
@@ -362,10 +425,10 @@ function get_default_item_for_price_history(frm) {
     return null;
 }
 
-function open_item_history_dialog(frm, default_item_code) {
+function open_item_history_dialog(frm, default_item_code, is_purchase) {
     // Always create a fresh dialog
     let d = new frappe.ui.Dialog({
-      title: 'Item Sales & Purchase Price History',
+      title: is_purchase ? 'Item Purchase Price History' : 'Item Sales & Purchase Price History',
       fields: [
         { fieldname: 'item_code', label: 'Item Code', fieldtype: 'Link', options: 'Item', default: default_item_code },
         { fieldname: 'results', fieldtype: 'HTML' }
@@ -376,32 +439,36 @@ function open_item_history_dialog(frm, default_item_code) {
         d.hide();
       }
     });
-  
+
     d.show();
-  
+
     setTimeout(() => {
       // Bind using Frappe's built-in onchange for the Link field
       if (d.fields_dict.item_code) {
         d.fields_dict.item_code.df.onchange = function () {
           const item_code = d.get_value('item_code');
           if (item_code) {
-            fetch_item_history(item_code, 20, d);
+            fetch_item_history(item_code, 20, d, is_purchase);
           }
         };
       }
-  
+
       // Auto-fetch if dialog opened with default item
       if (default_item_code) {
-        fetch_item_history(default_item_code, 20, d);
+        fetch_item_history(default_item_code, 20, d, is_purchase);
       }
     }, 200);
   }
-  
-  function fetch_item_history(item_code, limit, dialog) {
+
+  function fetch_item_history(item_code, limit, dialog, is_purchase) {
     dialog.fields_dict.results.$wrapper.html('<div class="text-muted">Loading…</div>');
-  
+
+    const method = is_purchase
+      ? 'fateh_trading.api.get_item_purchase_history'
+      : 'fateh_trading.api.get_item_sales_history';
+
     frappe.call({
-      method: 'fateh_trading.api.get_item_sales_history',
+      method: method,
       args: { item_code, limit },
       callback: function (r) {
         const rows = r.message || [];
@@ -409,8 +476,9 @@ function open_item_history_dialog(frm, default_item_code) {
           dialog.fields_dict.results.$wrapper.html('<div class="text-muted">No history found.</div>');
           return;
         }
-  
-        dialog.fields_dict.results.$wrapper.html(render_history_table(rows));
+
+        const html = is_purchase ? render_purchase_history_table(rows) : render_history_table(rows);
+        dialog.fields_dict.results.$wrapper.html(html);
 
         // enable invoice links
         dialog.fields_dict.results.$wrapper.find('[data-doctype][data-name]').on('click', function () {
@@ -434,41 +502,103 @@ function open_item_history_dialog(frm, default_item_code) {
       '<table class="table table-bordered table-sm" id="price-history-table">',
       '<thead>',
       '<tr>',
+      '<th>Date</th>',
       '<th>Item Code</th>',
       '<th>Item Name</th>',
       '<th>Customer</th>',
       '<th>Sales Rate</th>',
       '<th>Sales Qty</th>',
       '<th>Last Purchase Rate</th>',
+      '<th>Voucher Number</th>',
       '</tr>',
       '<tr class="filter-row">',
+      '<th><input type="text" class="form-control input-sm" placeholder="Filter Date"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Item Code"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Item Name"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Customer"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Sales Rate"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Sales Qty"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Purchase Rate"></th>',
+      '<th><input type="text" class="form-control input-sm" placeholder="Filter Voucher"></th>',
       '</tr>',
       '</thead>',
       '<tbody>'
     ].join('');
-  
+
     rows.forEach(function (r) {
+      var posting_date = frappe.utils.escape_html(frappe.datetime.str_to_user(r.posting_date || ''));
       var item_code = frappe.utils.escape_html(r.item_code || '');
       var item_name = frappe.utils.escape_html(r.item_name || '');
       var cust = frappe.utils.escape_html(r.customer_name || r.customer || '');
+      var voucher = frappe.utils.escape_html(r.sales_invoice || '');
       out += [
         '<tr>',
+        `<td>${posting_date}</td>`,
         `<td>${item_code}</td>`,
         `<td>${item_name}</td>`,
         `<td>${cust}</td>`,
         `<td class="text-right">${format_currency(r.stock_uom_rate || 0, r.currency || '')}</td>`,
         `<td class="text-right">${format_number(r.stock_qty ?? r.qty ?? 0, null)}</td>`,
         `<td class="text-right">${format_currency(r.last_purchase_rate || 0, r.currency || '')}</td>`,
+        `<td><a href="#" data-doctype="Sales Invoice" data-name="${voucher}">${voucher}</a></td>`,
         '</tr>'
       ].join('');
     });
-  
+
+    out += '</tbody></table></div>';
+    return out;
+  }
+
+  function render_purchase_history_table(rows) {
+    var out = [
+      '<div class="mt-3">',
+      '<table class="table table-bordered table-sm" id="price-history-table">',
+      '<thead>',
+      '<tr>',
+      '<th>Date</th>',
+      '<th>Item Code</th>',
+      '<th>Item Name</th>',
+      '<th>Supplier</th>',
+      '<th>Purchase Rate</th>',
+      '<th>Qty</th>',
+      '<th>Last Selling Rate</th>',
+      '<th>Document</th>',
+      '</tr>',
+      '<tr class="filter-row">',
+      '<th><input type="text" class="form-control input-sm" placeholder="Filter Date"></th>',
+      '<th><input type="text" class="form-control input-sm" placeholder="Filter Item Code"></th>',
+      '<th><input type="text" class="form-control input-sm" placeholder="Filter Item Name"></th>',
+      '<th><input type="text" class="form-control input-sm" placeholder="Filter Supplier"></th>',
+      '<th><input type="text" class="form-control input-sm" placeholder="Filter Rate"></th>',
+      '<th><input type="text" class="form-control input-sm" placeholder="Filter Qty"></th>',
+      '<th><input type="text" class="form-control input-sm" placeholder="Filter Last Selling"></th>',
+      '<th><input type="text" class="form-control input-sm" placeholder="Filter Document"></th>',
+      '</tr>',
+      '</thead>',
+      '<tbody>'
+    ].join('');
+
+    rows.forEach(function (r) {
+      var posting_date = frappe.utils.escape_html(frappe.datetime.str_to_user(r.posting_date || ''));
+      var item_code = frappe.utils.escape_html(r.item_code || '');
+      var item_name = frappe.utils.escape_html(r.item_name || '');
+      var supp = frappe.utils.escape_html(r.supplier_name || r.supplier || '');
+      var doc_name = frappe.utils.escape_html(r.doc_name || '');
+      var doctype = r.doctype || 'Purchase Invoice';
+      out += [
+        '<tr>',
+        `<td>${posting_date}</td>`,
+        `<td>${item_code}</td>`,
+        `<td>${item_name}</td>`,
+        `<td>${supp}</td>`,
+        `<td class="text-right">${format_currency(r.stock_uom_rate ?? r.purchase_rate ?? 0, r.currency || '')}</td>`,
+        `<td class="text-right">${format_number(r.stock_qty ?? r.qty ?? 0, null)}</td>`,
+        `<td class="text-right">${format_currency(r.last_selling_rate || 0, r.currency || '')}</td>`,
+        `<td><a href="#" data-doctype="${doctype}" data-name="${doc_name}">${doc_name}</a></td>`,
+        '</tr>'
+      ].join('');
+    });
+
     out += '</tbody></table></div>';
     return out;
   }
