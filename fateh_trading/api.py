@@ -152,4 +152,3 @@ def get_item_purchase_history(item_code=None, limit=20):
         r["last_selling_rate"] = last_selling.get(r.get("item_code")) or 0
 
     return rows
-

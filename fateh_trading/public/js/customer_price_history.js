@@ -25,12 +25,17 @@ const DOCTYPE_CONFIG = {
     "Purchase Invoice": {
         type: "purchase",
         child_doctype: "Purchase Invoice Item",
-        party_field: "supplier"
+        customer_field: "supplier"
     },
     "Purchase Receipt": {
         type: "purchase",
         child_doctype: "Purchase Receipt Item",
-        party_field: "supplier"
+        customer_field: "supplier"
+    },
+    "Purchase Order": {
+        type: "purchase",
+        child_doctype: "Purchase Order Item",
+        customer_field: "supplier"
     }
 };
 
@@ -480,9 +485,9 @@ function get_default_item_for_price_history(frm) {
 }
 
 function open_item_history_dialog(frm, default_item_code, is_purchase) {
-    const title = is_purchase ? 'Item Purchase Price History' : 'Item Sales & Purchase Price History';
+    // Always create a fresh dialog
     let d = new frappe.ui.Dialog({
-      title: title,
+      title: is_purchase ? 'Item Purchase Price History' : 'Item Sales & Purchase Price History',
       fields: [
         { fieldname: 'item_code', label: 'Item Code', fieldtype: 'Link', options: 'Item', default: default_item_code },
         { fieldname: 'results', fieldtype: 'HTML' }
@@ -493,9 +498,9 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
         d.hide();
       }
     });
-  
+
     d.show();
-  
+
     setTimeout(() => {
       if (d.fields_dict.item_code) {
         d.fields_dict.item_code.df.onchange = function () {
@@ -505,17 +510,21 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
           }
         };
       }
-  
+
+      // Auto-fetch if dialog opened with default item
       if (default_item_code) {
         fetch_item_history(default_item_code, 20, d, is_purchase);
       }
     }, 200);
   }
-  
+
   function fetch_item_history(item_code, limit, dialog, is_purchase) {
     dialog.fields_dict.results.$wrapper.html('<div class="text-muted">Loading…</div>');
-  
-    const method = is_purchase ? 'fateh_trading.api.get_item_purchase_history' : 'fateh_trading.api.get_item_sales_history';
+
+    const method = is_purchase
+      ? 'fateh_trading.api.get_item_purchase_history'
+      : 'fateh_trading.api.get_item_sales_history';
+
     frappe.call({
       method: method,
       args: { item_code, limit },
@@ -525,7 +534,7 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
           dialog.fields_dict.results.$wrapper.html('<div class="text-muted">No history found.</div>');
           return;
         }
-  
+
         const html = is_purchase ? render_purchase_history_table(rows) : render_history_table(rows);
         dialog.fields_dict.results.$wrapper.html(html);
 
@@ -549,41 +558,49 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
       '<table class="table table-bordered table-sm" id="price-history-table">',
       '<thead>',
       '<tr>',
+      '<th>Date</th>',
       '<th>Item Code</th>',
       '<th>Item Name</th>',
       '<th>Customer</th>',
       '<th>Sales Rate</th>',
       '<th>Sales Qty</th>',
       '<th>Last Purchase Rate</th>',
+      '<th>Voucher Number</th>',
       '</tr>',
       '<tr class="filter-row">',
+      '<th><input type="text" class="form-control input-sm" placeholder="Filter Date"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Item Code"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Item Name"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Customer"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Sales Rate"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Sales Qty"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Purchase Rate"></th>',
+      '<th><input type="text" class="form-control input-sm" placeholder="Filter Voucher"></th>',
       '</tr>',
       '</thead>',
       '<tbody>'
     ].join('');
-  
+
     rows.forEach(function (r) {
+      var posting_date = frappe.utils.escape_html(frappe.datetime.str_to_user(r.posting_date || ''));
       var item_code = frappe.utils.escape_html(r.item_code || '');
       var item_name = frappe.utils.escape_html(r.item_name || '');
       var cust = frappe.utils.escape_html(r.customer_name || r.customer || '');
+      var voucher = frappe.utils.escape_html(r.sales_invoice || '');
       out += [
         '<tr>',
+        `<td>${posting_date}</td>`,
         `<td>${item_code}</td>`,
         `<td>${item_name}</td>`,
         `<td>${cust}</td>`,
         `<td class="text-right">${format_currency(r.stock_uom_rate || 0, r.currency || '')}</td>`,
         `<td class="text-right">${format_number(r.stock_qty ?? r.qty ?? 0, null)}</td>`,
         `<td class="text-right">${format_currency(r.last_purchase_rate || 0, r.currency || '')}</td>`,
+        `<td><a href="#" data-doctype="Sales Invoice" data-name="${voucher}">${voucher}</a></td>`,
         '</tr>'
       ].join('');
     });
-  
+
     out += '</tbody></table></div>';
     return out;
   }
@@ -594,6 +611,7 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
       '<table class="table table-bordered table-sm" id="price-history-table">',
       '<thead>',
       '<tr>',
+      '<th>Date</th>',
       '<th>Item Code</th>',
       '<th>Item Name</th>',
       '<th>Supplier</th>',
@@ -603,6 +621,7 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
       '<th>Document</th>',
       '</tr>',
       '<tr class="filter-row">',
+      '<th><input type="text" class="form-control input-sm" placeholder="Filter Date"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Item Code"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Item Name"></th>',
       '<th><input type="text" class="form-control input-sm" placeholder="Filter Supplier"></th>',
@@ -616,6 +635,7 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
     ].join('');
 
     rows.forEach(function (r) {
+      var posting_date = frappe.utils.escape_html(frappe.datetime.str_to_user(r.posting_date || ''));
       var item_code = frappe.utils.escape_html(r.item_code || '');
       var item_name = frappe.utils.escape_html(r.item_name || '');
       var supp = frappe.utils.escape_html(r.supplier_name || r.supplier || '');
@@ -623,6 +643,7 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
       var doctype = r.doctype || 'Purchase Invoice';
       out += [
         '<tr>',
+        `<td>${posting_date}</td>`,
         `<td>${item_code}</td>`,
         `<td>${item_name}</td>`,
         `<td>${supp}</td>`,
@@ -637,7 +658,7 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
     out += '</tbody></table></div>';
     return out;
   }
-  
+
   function setupTableFilters(dialog, is_purchase) {
     const table = dialog.fields_dict.results.$wrapper.find('#price-history-table')[0];
     if (!table) return;
