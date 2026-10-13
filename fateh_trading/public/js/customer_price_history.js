@@ -93,7 +93,7 @@ function setup_doctype_handlers(doctype, config) {
             const cfg = frm.__fateh_trading_config || DOCTYPE_CONFIG[frm.doctype] || { customer_field: "customer", type: "sales" };
             const is_purchase = cfg.type === "purchase";
 
-            const hist_label = is_purchase ? __("Show Purchase History") : __("Show Price History");
+            const hist_label = is_purchase ? __("Show Purchase History") : __("Show Sales History");
             const history_btn = grid.add_custom_button(hist_label, () => {
                 open_item_history_dialog(frm, get_default_item_for_price_history(frm), is_purchase);
             });
@@ -121,14 +121,14 @@ function setup_doctype_handlers(doctype, config) {
             });
 
             // On sales documents, also offer the item's purchase history (a cost
-            // reference while selling) as a separate button after "Show Price History".
+            // reference while selling) as a separate button after "Show Sales History".
             const purchase_history_btn = is_purchase ? null : grid.add_custom_button(__("Show Purchase History"), () => {
                 open_item_history_dialog(frm, get_default_item_for_price_history(frm), true);
             });
 
             // Keep the native Add Row / Add Multiple buttons first; move our custom
             // buttons after them (add_custom_button prepends by default), in order:
-            // Price Assist, Show Price History, [Show Purchase History].
+            // Price Assist, Show Sales History, [Show Purchase History].
             price_assist_btn.appendTo(grid.grid_buttons);
             history_btn.appendTo(grid.grid_buttons);
             if (purchase_history_btn) purchase_history_btn.appendTo(grid.grid_buttons);
@@ -224,8 +224,8 @@ $.extend(fateh_trading.test, {
         $box.append(`
             <div class="pa-summary ${diff_class}">
                 <div class="pa-summary-main">
-                    <div><label>Last</label><span>${last_rate || "-"}</span></div>
-                    <div><label>Last Purchase</label><span>${last_purchase_rate ? last_purchase_rate.toFixed(2) : "-"}</span></div>
+                    <div><label>Last Selling Price</label><span>${last_rate || "-"}</span></div>
+                    <div><label>Last Purchase Cost</label><span>${last_purchase_rate ? last_purchase_rate.toFixed(2) : "-"}</span></div>
                     <div><label>Current</label><span>${current_rate || "-"}</span></div>
                 </div>
                 <div class="pa-summary-warning">${diff_text}</div>
@@ -484,6 +484,15 @@ function get_default_item_for_price_history(frm) {
     return null;
 }
 
+// English text with its Arabic equivalent underneath (when there is one)
+function with_arabic(english, arabic) {
+    var out = frappe.utils.escape_html(english || '');
+    if (arabic) {
+        out += '<div dir="rtl" style="font-size:12px;color:#555;">' + frappe.utils.escape_html(arabic) + '</div>';
+    }
+    return out;
+}
+
 function open_item_history_dialog(frm, default_item_code, is_purchase) {
     // Always create a fresh dialog
     let d = new frappe.ui.Dialog({
@@ -584,8 +593,8 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
     rows.forEach(function (r) {
       var posting_date = frappe.utils.escape_html(frappe.datetime.str_to_user(r.posting_date || ''));
       var item_code = frappe.utils.escape_html(r.item_code || '');
-      var item_name = frappe.utils.escape_html(r.item_name || '');
-      var cust = frappe.utils.escape_html(r.customer_name || r.customer || '');
+      var item_name = with_arabic(r.item_name, r.item_name_arabic);
+      var cust = with_arabic(r.customer_name || r.customer, r.party_name_arabic);
       var voucher = frappe.utils.escape_html(r.sales_invoice || '');
       out += [
         '<tr>',
@@ -615,7 +624,7 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
       '<th>Item Code</th>',
       '<th>Item Name</th>',
       '<th>Supplier</th>',
-      '<th>Purchase Rate</th>',
+      '<th>Net Purchase Rate</th>',
       '<th>Qty</th>',
       '<th>Last Selling Rate</th>',
       '<th>Document</th>',
@@ -637,8 +646,8 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
     rows.forEach(function (r) {
       var posting_date = frappe.utils.escape_html(frappe.datetime.str_to_user(r.posting_date || ''));
       var item_code = frappe.utils.escape_html(r.item_code || '');
-      var item_name = frappe.utils.escape_html(r.item_name || '');
-      var supp = frappe.utils.escape_html(r.supplier_name || r.supplier || '');
+      var item_name = with_arabic(r.item_name, r.item_name_arabic);
+      var supp = with_arabic(r.supplier_name || r.supplier, r.party_name_arabic);
       var doc_name = frappe.utils.escape_html(r.doc_name || '');
       var doctype = r.doctype || 'Purchase Invoice';
       out += [
@@ -647,7 +656,7 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
         `<td>${item_code}</td>`,
         `<td>${item_name}</td>`,
         `<td>${supp}</td>`,
-        `<td class="text-right">${format_currency(r.stock_uom_rate ?? r.purchase_rate ?? 0, r.currency || '')}</td>`,
+        `<td class="text-right">${format_currency(r.net_rate_stock_uom ?? r.stock_uom_rate ?? r.purchase_rate ?? 0, r.currency || '')}</td>`,
         `<td class="text-right">${format_number(r.stock_qty ?? r.qty ?? 0, null)}</td>`,
         `<td class="text-right">${format_currency(r.last_selling_rate || 0, r.currency || '')}</td>`,
         `<td><a href="#" data-doctype="${doctype}" data-name="${doc_name}">${doc_name}</a></td>`,

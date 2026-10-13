@@ -43,6 +43,47 @@ def get_item_warehouse_stock(item_code, company=None, limit=8):
 
 
 
+def get_last_landed_purchase_cost(item_code):
+    """Latest purchase cost per stock UOM, after discount and including landed cost.
+
+    Stock-affecting Purchase Receipt / Purchase Invoice lines carry `valuation_rate`,
+    which ERPNext derives from the net (post-discount) amount plus landed cost
+    vouchers and valuation taxes. Returns 0 when there is no such line.
+    """
+    receipt = frappe.db.sql(
+        """
+        SELECT p.posting_date, p.name, c.valuation_rate
+        FROM `tabPurchase Receipt Item` c
+        INNER JOIN `tabPurchase Receipt` p ON p.name = c.parent
+        WHERE c.item_code = %s AND p.docstatus = 1 AND p.is_return = 0
+          AND c.valuation_rate > 0
+        ORDER BY p.posting_date DESC, p.name DESC
+        LIMIT 1
+        """,
+        (item_code,),
+        as_dict=True,
+    )
+    invoice = frappe.db.sql(
+        """
+        SELECT p.posting_date, p.name, c.valuation_rate
+        FROM `tabPurchase Invoice Item` c
+        INNER JOIN `tabPurchase Invoice` p ON p.name = c.parent
+        WHERE c.item_code = %s AND p.docstatus = 1 AND p.is_return = 0
+          AND p.update_stock = 1 AND c.valuation_rate > 0
+        ORDER BY p.posting_date DESC, p.name DESC
+        LIMIT 1
+        """,
+        (item_code,),
+        as_dict=True,
+    )
+    latest = max(
+        receipt + invoice,
+        key=lambda r: (r.posting_date, r.name),
+        default=None,
+    )
+    return flt(latest.valuation_rate) if latest else 0
+
+
 @frappe.whitelist()
 def get_item_insights(customer, item_code, company=None, limit=6, other_limit=5):
     """Combined API: customer price history, other customers, stock, stats."""
@@ -136,6 +177,8 @@ def get_item_insights(customer, item_code, company=None, limit=6, other_limit=5)
         as_dict=True,
     )
     last_purchase_rate = flt(item_doc.get("last_purchase_rate") or 0) if item_doc else 0
+    # Prefer the landed, post-discount cost of the latest receipt over the list rate
+    last_purchase_rate = get_last_landed_purchase_cost(item_code) or last_purchase_rate
 
     # Last rate: stock_uom_rate from last Sales Invoice Item row (same item + customer), fallback to rate
     last_rate = price_history[0]["rate"] if price_history else 0
