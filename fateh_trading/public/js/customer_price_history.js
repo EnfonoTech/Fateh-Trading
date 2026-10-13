@@ -93,7 +93,7 @@ function setup_doctype_handlers(doctype, config) {
             const cfg = frm.__fateh_trading_config || DOCTYPE_CONFIG[frm.doctype] || { customer_field: "customer", type: "sales" };
             const is_purchase = cfg.type === "purchase";
 
-            const hist_label = is_purchase ? __("Show Purchase History") : __("Show Price History");
+            const hist_label = is_purchase ? __("Show Purchase History") : __("Show Sales History");
             const history_btn = grid.add_custom_button(hist_label, () => {
                 open_item_history_dialog(frm, get_default_item_for_price_history(frm), is_purchase);
             });
@@ -121,14 +121,14 @@ function setup_doctype_handlers(doctype, config) {
             });
 
             // On sales documents, also offer the item's purchase history (a cost
-            // reference while selling) as a separate button after "Show Price History".
+            // reference while selling) as a separate button after "Show Sales History".
             const purchase_history_btn = is_purchase ? null : grid.add_custom_button(__("Show Purchase History"), () => {
                 open_item_history_dialog(frm, get_default_item_for_price_history(frm), true);
             });
 
             // Keep the native Add Row / Add Multiple buttons first; move our custom
             // buttons after them (add_custom_button prepends by default), in order:
-            // Price Assist, Show Price History, [Show Purchase History].
+            // Price Assist, Show Sales History, [Show Purchase History].
             price_assist_btn.appendTo(grid.grid_buttons);
             history_btn.appendTo(grid.grid_buttons);
             if (purchase_history_btn) purchase_history_btn.appendTo(grid.grid_buttons);
@@ -224,8 +224,8 @@ $.extend(fateh_trading.test, {
         $box.append(`
             <div class="pa-summary ${diff_class}">
                 <div class="pa-summary-main">
-                    <div><label>Last</label><span>${last_rate || "-"}</span></div>
-                    <div><label>Last Purchase</label><span>${last_purchase_rate ? last_purchase_rate.toFixed(2) : "-"}</span></div>
+                    <div><label>Last Selling Price</label><span>${last_rate || "-"}</span></div>
+                    <div><label>Last Purchase Cost</label><span>${last_purchase_rate ? last_purchase_rate.toFixed(2) : "-"}</span></div>
                     <div><label>Current</label><span>${current_rate || "-"}</span></div>
                 </div>
                 <div class="pa-summary-warning">${diff_text}</div>
