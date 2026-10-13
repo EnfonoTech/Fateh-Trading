@@ -1,4 +1,32 @@
 import frappe
+from frappe.utils import cint, flt
+
+
+def _add_arabic_names(rows, *, party_doctype, party_key, arabic_party_field):
+    """Attach Arabic item / party names to history rows.
+
+    Two bulk lookups (items, parties) instead of a join, and skipped quietly on
+    a site where the Arabic custom fields do not exist.
+    """
+    if not rows:
+        return
+
+    def _arabic_map(doctype, field, names):
+        names = [n for n in set(names) if n]
+        if not names or not frappe.get_meta(doctype).has_field(field):
+            return {}
+        return {
+            d.name: d.get(field)
+            for d in frappe.get_all(
+                doctype, filters={"name": ["in", names]}, fields=["name", field]
+            )
+        }
+
+    item_ar = _arabic_map("Item", "custom_item_name_arabic", [r.get("item_code") for r in rows])
+    party_ar = _arabic_map(party_doctype, arabic_party_field, [r.get(party_key) for r in rows])
+    for r in rows:
+        r["item_name_arabic"] = item_ar.get(r.get("item_code")) or ""
+        r["party_name_arabic"] = party_ar.get(r.get(party_key)) or ""
 
 
 def _get_last_selling_rates(item_codes):
@@ -43,17 +71,9 @@ def get_item_sales_history(item_code=None, limit=20):
     if not frappe.has_permission("Sales Invoice", "read"):
         frappe.throw("Not permitted", frappe.PermissionError)
 
-    limit = int(limit or 20)
-    where = ["si.docstatus = 1"]
-    params = {"limit": limit}
+    params = {"limit": min(cint(limit) or 20, 200), "item_code": item_code or ""}
 
-    if item_code:
-        where.append("sii.item_code = %(item_code)s")
-        params["item_code"] = item_code
-
-    where_sql = " AND ".join(where)
-
-    rows = frappe.db.sql(f"""
+    rows = frappe.db.sql("""
         SELECT
             si.posting_date,
             si.name           AS sales_invoice,
@@ -74,34 +94,36 @@ def get_item_sales_history(item_code=None, limit=20):
         JOIN `tabSales Invoice` si ON si.name = sii.parent
         LEFT JOIN `tabCustomer` cust ON cust.name = si.customer
         LEFT JOIN `tabItem` item ON item.name = sii.item_code
-        WHERE {where_sql}
+        WHERE si.docstatus = 1
+          AND (%(item_code)s = '' OR sii.item_code = %(item_code)s)
         ORDER BY si.posting_date DESC, si.name DESC, sii.idx ASC
         LIMIT %(limit)s
     """, params, as_dict=True)
 
+    _add_arabic_names(
+        rows,
+        party_doctype="Customer",
+        party_key="customer",
+        arabic_party_field="custom_customer_name_arabic",
+    )
     return rows
 
 
 @frappe.whitelist()
 def get_item_purchase_history(item_code=None, limit=20):
-    """Get item purchase history from Purchase Invoice and Purchase Receipt."""
+    """Get item purchase history from Purchase Invoice and Purchase Receipt.
+
+    Rates are returned per stock UOM, *net* of discounts: `net_rate_stock_uom`
+    is the line's net_rate (after item and document-level discount) divided by
+    the conversion factor. `purchase_rate` / `stock_uom_rate` are the list-side
+    figures before document-level discount and are kept for reference.
+    """
     if not frappe.has_permission("Purchase Invoice", "read"):
         frappe.throw("Not permitted", frappe.PermissionError)
 
-    limit = int(limit or 20)
-    params = {"limit": limit, "item_code": item_code}
+    params = {"limit": min(cint(limit) or 20, 200), "item_code": item_code or ""}
 
-    # Purchase Invoice Items
-    where_pi = "pi.docstatus = 1"
-    if item_code:
-        where_pi += " AND pii.item_code = %(item_code)s"
-
-    # Purchase Receipt Items (union with PI for combined history)
-    where_pr = "pr.docstatus = 1"
-    if item_code:
-        where_pr += " AND pri.item_code = %(item_code)s"
-
-    sql = f"""
+    rows = frappe.db.sql("""
         (SELECT
             pi.posting_date,
             pi.name AS doc_name,
@@ -114,13 +136,16 @@ def get_item_purchase_history(item_code=None, limit=20):
             pii.qty,
             pii.stock_qty,
             pii.rate AS purchase_rate,
+            pii.net_rate,
+            pii.conversion_factor,
             pii.amount,
             pi.currency,
             pii.stock_uom_rate
         FROM `tabPurchase Invoice Item` pii
         JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
         LEFT JOIN `tabSupplier` sup ON sup.name = pi.supplier
-        WHERE {where_pi})
+        WHERE pi.docstatus = 1
+          AND (%(item_code)s = '' OR pii.item_code = %(item_code)s))
         UNION ALL
         (SELECT
             pr.posting_date,
@@ -134,21 +159,35 @@ def get_item_purchase_history(item_code=None, limit=20):
             pri.qty,
             pri.stock_qty,
             pri.rate AS purchase_rate,
+            pri.net_rate,
+            pri.conversion_factor,
             pri.amount,
             pr.currency,
             pri.stock_uom_rate
         FROM `tabPurchase Receipt Item` pri
         JOIN `tabPurchase Receipt` pr ON pr.name = pri.parent
         LEFT JOIN `tabSupplier` sup ON sup.name = pr.supplier
-        WHERE {where_pr})
+        WHERE pr.docstatus = 1
+          AND (%(item_code)s = '' OR pri.item_code = %(item_code)s))
         ORDER BY posting_date DESC, doc_name DESC
         LIMIT %(limit)s
-    """
-    rows = frappe.db.sql(sql, params, as_dict=True)
+    """, params, as_dict=True)
+
+    for r in rows:
+        cf = flt(r.get("conversion_factor")) or 1
+        net = flt(r.get("net_rate"))
+        # net_rate is 0 only on rows that predate it; fall back to the old figure.
+        r["net_rate_stock_uom"] = (net / cf) if net else flt(r.get("stock_uom_rate"))
 
     item_codes = list({r["item_code"] for r in rows if r.get("item_code")})
     last_selling = _get_last_selling_rates(item_codes)
     for r in rows:
         r["last_selling_rate"] = last_selling.get(r.get("item_code")) or 0
 
+    _add_arabic_names(
+        rows,
+        party_doctype="Supplier",
+        party_key="supplier",
+        arabic_party_field="custom_supplier_name_arabic",
+    )
     return rows

@@ -484,6 +484,15 @@ function get_default_item_for_price_history(frm) {
     return null;
 }
 
+// English text with its Arabic equivalent underneath (when there is one)
+function with_arabic(english, arabic) {
+    var out = frappe.utils.escape_html(english || '');
+    if (arabic) {
+        out += '<div dir="rtl" style="font-size:12px;color:#555;">' + frappe.utils.escape_html(arabic) + '</div>';
+    }
+    return out;
+}
+
 function open_item_history_dialog(frm, default_item_code, is_purchase) {
     // Always create a fresh dialog
     let d = new frappe.ui.Dialog({
@@ -584,8 +593,8 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
     rows.forEach(function (r) {
       var posting_date = frappe.utils.escape_html(frappe.datetime.str_to_user(r.posting_date || ''));
       var item_code = frappe.utils.escape_html(r.item_code || '');
-      var item_name = frappe.utils.escape_html(r.item_name || '');
-      var cust = frappe.utils.escape_html(r.customer_name || r.customer || '');
+      var item_name = with_arabic(r.item_name, r.item_name_arabic);
+      var cust = with_arabic(r.customer_name || r.customer, r.party_name_arabic);
       var voucher = frappe.utils.escape_html(r.sales_invoice || '');
       out += [
         '<tr>',
@@ -615,7 +624,7 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
       '<th>Item Code</th>',
       '<th>Item Name</th>',
       '<th>Supplier</th>',
-      '<th>Purchase Rate</th>',
+      '<th>Net Purchase Rate</th>',
       '<th>Qty</th>',
       '<th>Last Selling Rate</th>',
       '<th>Document</th>',
@@ -637,8 +646,8 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
     rows.forEach(function (r) {
       var posting_date = frappe.utils.escape_html(frappe.datetime.str_to_user(r.posting_date || ''));
       var item_code = frappe.utils.escape_html(r.item_code || '');
-      var item_name = frappe.utils.escape_html(r.item_name || '');
-      var supp = frappe.utils.escape_html(r.supplier_name || r.supplier || '');
+      var item_name = with_arabic(r.item_name, r.item_name_arabic);
+      var supp = with_arabic(r.supplier_name || r.supplier, r.party_name_arabic);
       var doc_name = frappe.utils.escape_html(r.doc_name || '');
       var doctype = r.doctype || 'Purchase Invoice';
       out += [
@@ -647,7 +656,7 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
         `<td>${item_code}</td>`,
         `<td>${item_name}</td>`,
         `<td>${supp}</td>`,
-        `<td class="text-right">${format_currency(r.stock_uom_rate ?? r.purchase_rate ?? 0, r.currency || '')}</td>`,
+        `<td class="text-right">${format_currency(r.net_rate_stock_uom ?? r.stock_uom_rate ?? r.purchase_rate ?? 0, r.currency || '')}</td>`,
         `<td class="text-right">${format_number(r.stock_qty ?? r.qty ?? 0, null)}</td>`,
         `<td class="text-right">${format_currency(r.last_selling_rate || 0, r.currency || '')}</td>`,
         `<td><a href="#" data-doctype="${doctype}" data-name="${doc_name}">${doc_name}</a></td>`,
