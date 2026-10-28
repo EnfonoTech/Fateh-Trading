@@ -24,7 +24,7 @@ def get_item_warehouse_stock(item_code, company=None, limit=8):
 
     query += """
         GROUP BY b.warehouse
-        ORDER BY SUM(b.projected_qty) DESC
+        ORDER BY SUM(b.actual_qty) DESC
         LIMIT %s
     """
     params.append(cint(limit))
@@ -43,6 +43,47 @@ def get_item_warehouse_stock(item_code, company=None, limit=8):
 
 
 
+def get_last_landed_purchase_cost(item_code):
+    """Latest purchase cost per stock UOM, after discount and including landed cost.
+
+    Stock-affecting Purchase Receipt / Purchase Invoice lines carry `valuation_rate`,
+    which ERPNext derives from the net (post-discount) amount plus landed cost
+    vouchers and valuation taxes. Returns 0 when there is no such line.
+    """
+    receipt = frappe.db.sql(
+        """
+        SELECT p.posting_date, p.name, c.valuation_rate
+        FROM `tabPurchase Receipt Item` c
+        INNER JOIN `tabPurchase Receipt` p ON p.name = c.parent
+        WHERE c.item_code = %s AND p.docstatus = 1 AND p.is_return = 0
+          AND c.valuation_rate > 0
+        ORDER BY p.posting_date DESC, p.name DESC
+        LIMIT 1
+        """,
+        (item_code,),
+        as_dict=True,
+    )
+    invoice = frappe.db.sql(
+        """
+        SELECT p.posting_date, p.name, c.valuation_rate
+        FROM `tabPurchase Invoice Item` c
+        INNER JOIN `tabPurchase Invoice` p ON p.name = c.parent
+        WHERE c.item_code = %s AND p.docstatus = 1 AND p.is_return = 0
+          AND p.update_stock = 1 AND c.valuation_rate > 0
+        ORDER BY p.posting_date DESC, p.name DESC
+        LIMIT 1
+        """,
+        (item_code,),
+        as_dict=True,
+    )
+    latest = max(
+        receipt + invoice,
+        key=lambda r: (r.posting_date, r.name),
+        default=None,
+    )
+    return flt(latest.valuation_rate) if latest else 0
+
+
 @frappe.whitelist()
 def get_item_insights(customer, item_code, company=None, limit=6, other_limit=5):
     """Combined API: customer price history, other customers, stock, stats."""
@@ -57,6 +98,7 @@ def get_item_insights(customer, item_code, company=None, limit=6, other_limit=5)
             si.posting_date,
             si.customer,
             sid.rate,
+            sid.stock_uom_rate,
             sid.qty,
             sid.stock_qty,
             sid.uom,
@@ -76,6 +118,7 @@ def get_item_insights(customer, item_code, company=None, limit=6, other_limit=5)
     )
 
     for d in price_history:
+        # Keep normal (transaction) rate, uom, qty for Price Assist display
         d["rate"] = flt(d.get("rate") or 0)
         d["qty"] = flt(d.get("qty") or 0)
         d["stock_qty"] = flt(d.get("stock_qty") or 0)
@@ -93,6 +136,7 @@ def get_item_insights(customer, item_code, company=None, limit=6, other_limit=5)
             si.posting_date,
             si.customer,
             sid.rate,
+            sid.stock_uom_rate,
             sid.qty,
             sid.stock_qty,
             sid.uom,
@@ -133,6 +177,8 @@ def get_item_insights(customer, item_code, company=None, limit=6, other_limit=5)
         as_dict=True,
     )
     last_purchase_rate = flt(item_doc.get("last_purchase_rate") or 0) if item_doc else 0
+    # Prefer the landed, post-discount cost of the latest receipt over the list rate
+    last_purchase_rate = get_last_landed_purchase_cost(item_code) or last_purchase_rate
 
     # Last rate: stock_uom_rate from last Sales Invoice Item row (same item + customer), fallback to rate
     last_rate = price_history[0]["rate"] if price_history else 0
@@ -156,5 +202,155 @@ def get_item_insights(customer, item_code, company=None, limit=6, other_limit=5)
         "stock": stock,
         "last_purchase_rate": last_purchase_rate,
         "last_rate": last_rate,
+    }
+
+
+@frappe.whitelist()
+def get_item_purchase_insights(supplier, item_code, company=None, limit=6, other_limit=5):
+    """Combined API for purchase Price Assist: supplier purchase history, other suppliers, stock, last selling rate."""
+    if not item_code:
+        return {}
+
+    supplier = supplier or ""
+
+    # Purchase history from both Purchase Invoice and Purchase Receipt for this supplier (rates & qty in stock UOM)
+    pi_query = """
+        SELECT
+            pi.name AS doc_name,
+            'Purchase Invoice' AS doctype,
+            pi.posting_date,
+            pi.supplier,
+            pii.rate,
+            pii.stock_uom_rate,
+            pii.qty,
+            pii.stock_qty,
+            pii.uom,
+            pii.stock_uom,
+            pii.conversion_factor,
+            pi.currency
+        FROM `tabPurchase Invoice Item` pii
+        INNER JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
+        WHERE pii.item_code = %s AND pi.docstatus = 1 AND pi.supplier = %s
+        ORDER BY pi.posting_date DESC
+        LIMIT %s
+    """
+    pr_query = """
+        SELECT
+            pr.name AS doc_name,
+            'Purchase Receipt' AS doctype,
+            pr.posting_date,
+            pr.supplier,
+            pri.rate,
+            pri.stock_uom_rate,
+            pri.qty,
+            pri.stock_qty,
+            pri.uom,
+            pri.stock_uom,
+            pri.conversion_factor,
+            pr.currency
+        FROM `tabPurchase Receipt Item` pri
+        INNER JOIN `tabPurchase Receipt` pr ON pr.name = pri.parent
+        WHERE pri.item_code = %s AND pr.docstatus = 1 AND pr.supplier = %s
+        ORDER BY pr.posting_date DESC
+        LIMIT %s
+    """
+    lim = cint(limit)
+    pi_rows = frappe.db.sql(pi_query, (item_code, supplier, lim), as_dict=True)
+    pr_rows = frappe.db.sql(pr_query, (item_code, supplier, lim), as_dict=True)
+    price_history = []
+    for d in pi_rows:
+        d["rate"] = flt(d.get("rate") or 0)
+        d["qty"] = flt(d.get("qty") or 0)
+        d["si"] = d["doc_name"]
+        price_history.append(d)
+    for d in pr_rows:
+        d["rate"] = flt(d.get("rate") or 0)
+        d["qty"] = flt(d.get("qty") or 0)
+        d["si"] = d["doc_name"]
+        price_history.append(d)
+    price_history.sort(key=lambda x: (x.get("posting_date") or "", x.get("doc_name") or ""), reverse=True)
+    price_history = price_history[:lim]
+
+    other_pi = frappe.db.sql("""
+        SELECT pi.name AS doc_name, 'Purchase Invoice' AS doctype, pi.posting_date, pi.supplier,
+               pii.rate, pii.stock_uom_rate, pii.qty, pii.stock_qty, pii.uom, pii.stock_uom, pii.conversion_factor, pi.currency
+        FROM `tabPurchase Invoice Item` pii
+        INNER JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
+        WHERE pii.item_code = %s AND pi.docstatus = 1 AND pi.supplier != %s
+        ORDER BY pi.posting_date DESC
+        LIMIT %s
+    """, (item_code, supplier, cint(other_limit)), as_dict=True)
+    other_pr = frappe.db.sql("""
+        SELECT pr.name AS doc_name, 'Purchase Receipt' AS doctype, pr.posting_date, pr.supplier,
+               pri.rate, pri.stock_uom_rate, pri.qty, pri.stock_qty, pri.uom, pri.stock_uom, pri.conversion_factor, pr.currency
+        FROM `tabPurchase Receipt Item` pri
+        INNER JOIN `tabPurchase Receipt` pr ON pr.name = pri.parent
+        WHERE pri.item_code = %s AND pr.docstatus = 1 AND pr.supplier != %s
+        ORDER BY pr.posting_date DESC
+        LIMIT %s
+    """, (item_code, supplier, cint(other_limit)), as_dict=True)
+    other_suppliers = list(other_pi) + list(other_pr)
+    for d in other_suppliers:
+        d["rate"] = flt(d.get("rate") or 0)
+        d["qty"] = flt(d.get("qty") or 0)
+        d["customer"] = d.get("supplier")
+    other_suppliers.sort(key=lambda x: (x.get("posting_date") or "", x.get("doc_name") or ""), reverse=True)
+    other_suppliers = other_suppliers[: cint(other_limit)]
+
+    stock = get_item_warehouse_stock(item_code=item_code, company=company, limit=8)
+
+    # Last purchase rate for this supplier (stock UOM rate)
+    last_rate = 0
+    if price_history:
+        first = price_history[0]
+        last_rate = flt(first.get("stock_uom_rate") or first.get("rate") or 0)
+    else:
+        row = frappe.db.sql("""
+            SELECT COALESCE(pii.stock_uom_rate, pii.rate) AS last_rate
+            FROM `tabPurchase Invoice Item` pii
+            INNER JOIN `tabPurchase Invoice` pi ON pi.name = pii.parent
+            WHERE pii.item_code = %s AND pi.supplier = %s AND pi.docstatus = 1
+            ORDER BY pi.posting_date DESC, pi.name DESC
+            LIMIT 1
+        """, (item_code, supplier), as_dict=True)
+        if row and row[0].get("last_rate") is not None:
+            last_rate = flt(row[0]["last_rate"])
+        else:
+            row = frappe.db.sql("""
+                SELECT COALESCE(pri.stock_uom_rate, pri.rate) AS last_rate
+                FROM `tabPurchase Receipt Item` pri
+                INNER JOIN `tabPurchase Receipt` pr ON pr.name = pri.parent
+                WHERE pri.item_code = %s AND pr.supplier = %s AND pr.docstatus = 1
+                ORDER BY pr.posting_date DESC, pr.name DESC
+                LIMIT 1
+            """, (item_code, supplier), as_dict=True)
+            if row and row[0].get("last_rate") is not None:
+                last_rate = flt(row[0]["last_rate"])
+
+    # Last purchase rate from Item master; valuation rate from Bin (stock), not Item master
+    item_doc = frappe.db.get_value("Item", item_code, "last_purchase_rate", as_dict=True)
+    last_purchase_rate = flt(item_doc.get("last_purchase_rate") or 0) if item_doc else 0
+
+    valuation_rate = 0
+    bin_query = """
+        SELECT SUM(b.stock_value) / NULLIF(SUM(b.actual_qty), 0) AS valuation_rate
+        FROM `tabBin` b
+        WHERE b.item_code = %s AND b.actual_qty > 0
+    """
+    bin_params = [item_code]
+    if company:
+        bin_query += " AND EXISTS (SELECT 1 FROM `tabWarehouse` w WHERE w.name = b.warehouse AND w.company = %s)"
+        bin_params.append(company)
+    row = frappe.db.sql(bin_query, tuple(bin_params), as_dict=True)
+    if row and row[0].get("valuation_rate") is not None:
+        valuation_rate = flt(row[0]["valuation_rate"])
+
+    return {
+        "price_history": price_history,
+        "other_customers": other_suppliers,
+        "stock": stock,
+        "last_purchase_rate": last_purchase_rate,
+        "last_rate": last_rate,
+        "valuation_rate": valuation_rate,
     }
 
