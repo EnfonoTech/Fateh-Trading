@@ -52,3 +52,26 @@ class TestItemPurchaseHistory(FrappeTestCase):
 	def test_limit_is_capped(self):
 		rows = get_item_purchase_history(item_code=None, limit=100000)
 		self.assertLessEqual(len(rows), 200)
+
+	def test_receipt_rate_is_company_currency_with_landed_cost(self):
+		"""Imports showed `13.50 $`; the dialog must show the SAR cost incl. landed cost."""
+		line = frappe.db.sql(
+			"""
+			select pri.item_code, pr.name as doc_name, pri.valuation_rate
+			from `tabPurchase Receipt Item` pri
+			join `tabPurchase Receipt` pr on pr.name = pri.parent
+			where pr.docstatus = 1 and pri.landed_cost_voucher_amount > 0 and pr.conversion_rate > 1
+			order by pr.posting_date desc
+			limit 1
+			""",
+			as_dict=True,
+		)
+		if not line:
+			self.skipTest("no foreign-currency receipt with landed cost")
+		line = line[0]
+
+		rows = get_item_purchase_history(item_code=line.item_code, limit=200)
+		row = next(r for r in rows if r["doc_name"] == line.doc_name)
+		self.assertAlmostEqual(row["rate_company_currency"], flt(line.valuation_rate), places=4)
+		self.assertGreater(row["rate_company_currency"], row["net_rate_stock_uom"])
+		self.assertNotEqual(row["company_currency"], row["currency"])

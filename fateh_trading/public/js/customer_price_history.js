@@ -624,7 +624,7 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
       '<th>Item Code</th>',
       '<th>Item Name</th>',
       '<th>Supplier</th>',
-      '<th>Net Purchase Rate</th>',
+      '<th title="Receipts include landed cost">Net Purchase Rate (incl. Landed Cost)</th>',
       '<th>Qty</th>',
       '<th>Last Selling Rate</th>',
       '<th>Document</th>',
@@ -656,9 +656,9 @@ function open_item_history_dialog(frm, default_item_code, is_purchase) {
         `<td>${item_code}</td>`,
         `<td>${item_name}</td>`,
         `<td>${supp}</td>`,
-        `<td class="text-right">${format_currency(r.net_rate_stock_uom ?? r.stock_uom_rate ?? r.purchase_rate ?? 0, r.currency || '')}</td>`,
+        `<td class="text-right">${format_currency(r.rate_company_currency ?? r.net_rate_stock_uom ?? 0, r.company_currency || '')}</td>`,
         `<td class="text-right">${format_number(r.stock_qty ?? r.qty ?? 0, null)}</td>`,
-        `<td class="text-right">${format_currency(r.last_selling_rate || 0, r.currency || '')}</td>`,
+        `<td class="text-right">${format_currency(r.last_selling_rate || 0, r.company_currency || '')}</td>`,
         `<td><a href="#" data-doctype="${doctype}" data-name="${doc_name}">${doc_name}</a></td>`,
         '</tr>'
       ].join('');
