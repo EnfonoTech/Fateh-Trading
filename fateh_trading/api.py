@@ -1,3 +1,4 @@
+import erpnext
 import frappe
 from frappe.utils import cint, flt
 
@@ -39,7 +40,7 @@ def _get_last_selling_rates(item_codes):
         rows = frappe.db.sql("""
             SELECT item_code, last_selling_rate FROM (
                 SELECT sii.item_code,
-                    COALESCE(sii.stock_uom_rate, sii.rate) AS last_selling_rate,
+                    COALESCE(sii.stock_uom_rate, sii.rate) * IFNULL(NULLIF(si.conversion_rate, 0), 1) AS last_selling_rate,
                     ROW_NUMBER() OVER (PARTITION BY sii.item_code ORDER BY si.posting_date DESC, si.name DESC) AS rn
                 FROM `tabSales Invoice Item` sii
                 INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
@@ -52,7 +53,7 @@ def _get_last_selling_rates(item_codes):
         result = {}
         for code in item_codes:
             row = frappe.db.sql("""
-                SELECT COALESCE(sii.stock_uom_rate, sii.rate) AS last_selling_rate
+                SELECT COALESCE(sii.stock_uom_rate, sii.rate) * IFNULL(NULLIF(si.conversion_rate, 0), 1) AS last_selling_rate
                 FROM `tabSales Invoice Item` sii
                 INNER JOIN `tabSales Invoice` si ON si.name = sii.parent
                 WHERE si.docstatus = 1 AND sii.item_code = %s
@@ -117,6 +118,11 @@ def get_item_purchase_history(item_code=None, limit=20):
     is the line's net_rate (after item and document-level discount) divided by
     the conversion factor. `purchase_rate` / `stock_uom_rate` are the list-side
     figures before document-level discount and are kept for reference.
+
+    `rate_company_currency` is what the dialog shows: the cost per stock UOM in
+    the company currency. For a receipt it is the line's valuation rate, which
+    already includes landed cost; an invoice carries no landed cost, so it is
+    the base net rate. `last_selling_rate` is in the company currency too.
     """
     if not frappe.has_permission("Purchase Invoice", "read"):
         frappe.throw("Not permitted", frappe.PermissionError)
@@ -137,6 +143,8 @@ def get_item_purchase_history(item_code=None, limit=20):
             pii.stock_qty,
             pii.rate AS purchase_rate,
             pii.net_rate,
+            pii.base_net_rate,
+            NULL AS valuation_rate,
             pii.conversion_factor,
             pii.amount,
             pi.currency,
@@ -160,6 +168,8 @@ def get_item_purchase_history(item_code=None, limit=20):
             pri.stock_qty,
             pri.rate AS purchase_rate,
             pri.net_rate,
+            pri.base_net_rate,
+            pri.valuation_rate,
             pri.conversion_factor,
             pri.amount,
             pr.currency,
@@ -178,6 +188,9 @@ def get_item_purchase_history(item_code=None, limit=20):
         net = flt(r.get("net_rate"))
         # net_rate is 0 only on rows that predate it; fall back to the old figure.
         r["net_rate_stock_uom"] = (net / cf) if net else flt(r.get("stock_uom_rate"))
+        base_net = flt(r.get("base_net_rate")) / cf
+        r["rate_company_currency"] = flt(r.get("valuation_rate")) or base_net
+        r["company_currency"] = erpnext.get_company_currency(r.get("company")) if r.get("company") else ""
 
     item_codes = list({r["item_code"] for r in rows if r.get("item_code")})
     last_selling = _get_last_selling_rates(item_codes)
